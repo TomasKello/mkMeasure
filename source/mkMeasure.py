@@ -5,6 +5,7 @@ import serial
 import glob
 import time
 
+import ColorLogger
 import SerialConnector
 import SocketConnector
 import Device
@@ -14,6 +15,7 @@ import InputParser
 #constants
 delim = '\n'
 
+'''
 def log(log_type="i",text=""):
     source = "mkMeasure:       "
     if "i" in log_type:
@@ -30,6 +32,10 @@ def log(log_type="i",text=""):
         print("<<     ",text)
     elif "tt" in log_type:
         return input(text+"  >>")
+'''
+def log(log_type="i",text=""):
+    clogger = ColorLogger.ColorLogger("mkMeasure:       ")
+    return clogger.log(log_type,text)
 
 def range_list(arg_value):
     #######################################
