@@ -5,16 +5,16 @@ Multi-device control console application. Plug-n-Play design for serial RS232 an
 - motion controller 
 - environmental readings
 
-Get repository:
+# Get repository: 
 git clone https://github.com/TomasKello/mkMeasure.git
 
-Install:
-cd mkMeasure/install
-(Install pre-requisites in requirements.txt)
-chmod u+rwx setup.sh
-./setup.sh
+# Install:  
+cd mkMeasure/install  
+(Install pre-requisites in requirements.txt)  
+chmod u+rwx setup.sh  
+./setup.sh  
 
-Re-compile if needed:
-cd mkMeasure/install
-chmod u+rwx update.sh
-./update.sh
+# Re-compile if needed:  
+cd mkMeasure/install  
+chmod u+rwx update.sh  
+./update.sh  
