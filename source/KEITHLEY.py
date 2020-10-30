@@ -57,6 +57,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "*IDN?", 'vital' : True },              
 
 #"Do commands" invoke device function which does not require additional parameter
 cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                      #@Reset device into default settings and cancel pending cmds
+	       'CMDINIT' : { 'cmd' : "\n", 'vital' : False},              #@Some devices require initial cmd to enable communication using commands	
                'POSETUP' : { 'cmd' : "SYST:POS RST", 'vital' : False},              #@Set Power On default settings (settings after power up) to settings defined by *RST
                'CLRBUFF' : { 'cmd' : "TRAC:CLE", 'vital' : True},                   #@Clear buffer
                'TRIGGERABORT' : { 'cmd' : "ABORT", 'vital' : False},                #@Abort operations and send trigger to idle
