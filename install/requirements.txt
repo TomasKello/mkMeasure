@@ -1,0 +1,11 @@
+#Python 3.6 (set it default preferably NOT using alias)
+sudo yum install rh-python36
+
+#PySerial
+python3 -m pip install pyserial
+
+#PyInstaller
+python3 -m pip install pyinstaller
+
+#Other tools
+python3 -m pip install --user numpy scipy matplotlib pandas
