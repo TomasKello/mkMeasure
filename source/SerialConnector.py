@@ -3,23 +3,11 @@
 import os, sys
 import serial
 import glob
+import ColorLogger
 
 def log(log_type="i",text=""):
-    source = "SerialConnector: "
-    if "i" in log_type:
-        print(source,"[INFO]     ",text)
-    elif "n" in log_type:
-        print("                  ",text)
-    elif "w" in log_type:
-        print(source,"[WARNING]  ",text)
-    elif "e" in log_type:
-        print(source,"[ERROR]    ",text)
-    elif "f" in log_type:
-        print(source,"[FATAL]    ",text)
-    elif "t" in log_type and "tt" not in log_type:
-        print("<<     ",text)
-    elif "tt" in log_type:
-        return input(text+"  >>")
+    clogger = ColorLogger.ColorLogger("SerialConnector: ")
+    return clogger.log(log_type,text)
 
 class SerialConnector:
     def __init__(self,args):
@@ -197,6 +185,13 @@ class SerialConnector:
                 relevantDevs = [key for key in devices.keys() if ( (key == "source" and self.args.extVSource) or (key in self.args.addPort) or key == "meas" )]
                 relevantPorts = {}
                 usedPorts = []
+                #refresh used ports
+                for relDev in goodAttempts.keys():
+                    if self.args.verbosity > 1:
+                        log("i","Adding "+relDev+" to the correctly matched ports.")
+                    usedPorts.append(goodAttempts[relDev])
+
+                #loop over relevant devices and ports
                 for relDev in relevantDevs:
                     #use default settings if possible
                     if relDev in goodAttempts.keys():
@@ -220,51 +215,33 @@ class SerialConnector:
 
                     isDefault = False
                     for port in relevantPorts[relDev]:
-                        if port in usedPorts: continue
+                        #print("reldev="+relDev+" port="+port)
+                        if port in usedPorts:
+                            if relDev in goodAttempts.keys():
+                                devices[relDev]['port'] = port 
+                                selected_ports[relDev] = devices[relDev]
+                            continue
                         if devices[relDev]['port'] in port:
+                            #print("match "+devices[relDev]['port'])
                             devices[relDev]['port'] = port
                             selected_ports[relDev] = devices[relDev]
                             usedPorts.append(port)
                             isDefault = True
                             break
+                        #print(selected_ports)
 
                     #else find alternative                    
                     if not isDefault:
                         for port in relevantPorts[relDev]:
-                            if port in usedPorts: continue
+                            if port in usedPorts: 
+                                if relDev in goodAttempts.keys():   
+                                    devices[relDev]['port'] = port
+                                    selected_ports[relDev] = devices[relDev]
+                                continue
                             devices[relDev]['port'] = port
                             selected_ports[relDev] = devices[relDev]
                             usedPorts.append(port)
                             break
-                '''
-                #first use default settings
-                notMatchedKeys = []
-                usedPorts = []
-                for key in devices.keys():
-                    if ((key == "source" and not self.args.extVSource) or (key not in self.args.addPort)) and key != "meas": continue
-                    keyUsed = False
-                    for port in COM_ports:
-                        if devices[key]['port'] in port:
-                            usedPorts.append(port) 
-                            devices[key]['port'] = port
-                            selected_ports[key] = devices[key]
-                            keyUsed = True
-                            break
-                    if not keyUsed: 
-                        notMatchedKeys.append(key)
-                        log("w","Device type: "+str(key)+" as specified in device config has no matching port.")
-                        log("i","Autoselecting next available port.")
-
-                #then retry with next available USB port
-                unusedPorts = [port for port in COM_ports if port not in usedPorts and "USB" in port]
-                for ikey,key in enumerate(notMatchedKeys):
-                    if ikey < len(unusedPorts):
-                        devices[key]['port'] = unusedPorts[ikey]
-                        selected_ports[key] = devices[key]
-                    else:
-                        log("e","No more active ports for device type: "+str(key)+".")
-                        sys.exit(0)
-                '''        
 
         if self.args.extVSource:
             log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))

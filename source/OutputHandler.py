@@ -3,23 +3,11 @@
 import os, sys
 import datetime
 import json
+import ColorLogger
 
 def log(log_type="i",text=""):
-    source = "OutputHandler:   "
-    if "i" in log_type:
-        print(source,"[INFO]     ",text)
-    elif "n" in log_type:
-        print("                  ",text)
-    elif "w" in log_type:
-        print(source,"[WARNING]  ",text)
-    elif "e" in log_type:
-        print(source,"[ERROR]    ",text)
-    elif "f" in log_type:
-        print(source,"[FATAL]    ",text)
-    elif "t" in log_type and "tt" not in log_type:
-        print("<<     ",text)
-    elif "tt" in log_type:
-        return input(text+"  >>")
+    clogger = ColorLogger.ColorLogger("OutputHandler:   ")
+    return clogger.log(log_type,text)
 
 class OutputHandler:
     def __init__(self,args):

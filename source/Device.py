@@ -4,25 +4,11 @@ import os, sys
 import time
 import datetime as dt
 import importlib
+import ColorLogger
 
 def log(log_type="i",text=""):
-    source = "Device:          "
-    if "i" in log_type:
-        print(source,"[INFO]     ",text)
-    elif "n" in log_type:
-        print("                  ",text)
-    elif "w" in log_type:
-        print(source,"[WARNING]  ",text)
-    elif "h" in log_type:
-        print(source,"[HAZARD]   ",text)    
-    elif "e" in log_type:
-        print(source,"[ERROR]    ",text)
-    elif "f" in log_type:
-        print(source,"[FATAL]    ",text)
-    elif "t" in log_type and "tt" not in log_type:
-        print("<<     ",text)
-    elif "tt" in log_type:
-        return input(text+"  >>")
+    clogger = ColorLogger.ColorLogger("Device:          ")
+    return clogger.log(log_type,text)
 
 class Device:
     def __init__(self,args):
@@ -41,7 +27,7 @@ class Device:
         self.devs = {}
         self.coms = {}
 
-    def __getResponse__(self,com):
+    def __getResponse__(self, com):
         #######################################################
         #Get response from selected device based on given 
         #device ID. If there is no response, user is asked
@@ -64,8 +50,9 @@ class Device:
         except FileNotFoundError:
             log("e",com['id']+".py class tried to load non-existing binaries.")
             sys.exit(0)
-        except Exception:
+        except Exception as e:
             log("f",com['id']+".py class raised an unknown exception! Check for syntax errors.")
+            log("f",str(type(e)))
             sys.exit(0)
 
         if _devs[com['id']].test() == com['id']:
@@ -77,6 +64,11 @@ class Device:
         self.devs[com['id']] = _devs[com['id']]                      #Enable access to device routines
         self.__write__(self.__cmd__(com,"CMDINIT"))                  #Some devices require initial sequence to enable sending commands
         real_id = self.__read__(self.__cmd__(com,"ID?",vital=True))  #Real ID may contain more strings than predefined keyword
+        #clean real ID from invisible symbols
+        if "\r" in real_id:
+            real_id = "".join([c for c in real_id.split("\r") if c != ""])
+        if "\n" in real_id:
+            real_id = "".join([c for c in real_id.split("\n") if c != ""])
         if real_id is not "":
             if real_id == "REFUSED":
                 log("e","Socket connection refused for DEV="+com['id']+".")

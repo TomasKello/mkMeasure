@@ -46,6 +46,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "1ID?", 'vital' : True },               
 
 #"Do commands" invoke device function which does not require additional parameter
 cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                      #@Reset device into default settings and cancel pending cmds
+               'CMDINIT' : { 'cmd' : "\r", 'vital' : False},                      #@Some devices require initial cmd to enable communication using commands
                'POSETUP' : { 'cmd' : "SYST:POS RST", 'vital' : False},              #@Set Power On default settings (settings after power up) to settings defined by *RST
                'CLRBUFF' : { 'cmd' : "TRAC:CLE", 'vital' : True},                   #@Clear buffer
                'TRIGGERABORT' : { 'cmd' : "ABORT", 'vital' : False},                #@Abort operations and send trigger to idle
@@ -172,7 +173,9 @@ class ESP100():
                 part = com.read(1).decode().strip('\r')
                 read_value += part
             except UnicodeDecodeError:
-                print("ESP100:           [WARNING]   Decoding error detected. Residual bits found in buffer.")
+                WARNING = '\033[93;1m'
+                ENDC    = '\033[0m'
+                print(WARNING+" ESP100:           [WARNING]   Decoding error detected. Residual bits found in buffer."+ENDC)
         return read_value.rstrip()
 
     def pre(self,com):
