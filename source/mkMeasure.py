@@ -15,24 +15,6 @@ import InputParser
 #constants
 delim = '\n'
 
-'''
-def log(log_type="i",text=""):
-    source = "mkMeasure:       "
-    if "i" in log_type:
-        print(source,"[INFO]     ",text)
-    elif "n" in log_type:
-        print("                  ",text)
-    elif "w" in log_type:
-        print(source,"[WARNING]  ",text)
-    elif "e" in log_type:
-        print(source,"[ERROR]    ",text)
-    elif "f" in log_type:
-        print(source,"[FATAL]    ",text)
-    elif "t" in log_type and "tt" not in log_type:
-        print("<<     ",text)
-    elif "tt" in log_type:
-        return input(text+"  >>")
-'''
 def log(log_type="i",text=""):
     clogger = ColorLogger.ColorLogger("mkMeasure:       ")
     return clogger.log(log_type,text)
@@ -103,6 +85,7 @@ def arg_list(arg_value):
     else:
         msg = log("e","Incorrect list format given on input.")
         raise argparse.ArgumentTypeError(msg)
+    return _custom_list
 
 def dev_list(arg_value):
     ##########################################
@@ -164,7 +147,7 @@ if __name__ == '__main__':
     measGroup.add_argument('-s','--single', nargs=1, type=float, dest='single', metavar='<bias>' , help='Single IV measurement. USAGE: -s 60.5', action='store', default=None)
     measGroup.add_argument('-m','--multi',      type=range_list, dest='multi' , metavar='<bias_range>'  , help='Multiple point IV measurement. USAGE: -m start end incr OR -c [1,2,3,4]', action='store', default=None)
     measGroup.add_argument('-c','--continuous', type=range_list, dest='continuous', metavar='<bias_range>', help='Continuous IV measurement. USAGE: -c start end incr OR -c [1,2,3,4]', action='store', default=None)
-    parser.add_argument('-r','--repeat', nargs=1, type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
+    parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
     parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
 
@@ -228,6 +211,7 @@ if __name__ == '__main__':
     #Parse input configuration
     #--------------------------
     if not EMG:
+        args.repeat = int(args.repeat)
         sequence = []
         if args.configFile is not None:
             inputParser = InputParser.InputParser(args)
@@ -264,7 +248,7 @@ if __name__ == '__main__':
             sys.exit(0)
         for seq in sequence:
             for varToCheck in ['sampleTime','nSamples']:
-                if 'bias' in seq and len(seq['bias']) > len(seq[varToCheck]): 
+                if 'bias' in seq.keys() and len(seq['bias']) > len(seq[varToCheck]): 
                     if len(seq[varToCheck]) == 1:
                         seq[varToCheck] = [seq[varToCheck][0]]*len(seq['bias'])
                     else:

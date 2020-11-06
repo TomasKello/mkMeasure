@@ -198,7 +198,7 @@ class SerialConnector:
                         relevantPorts[relDev] = [goodAttempts[relDev]] #precisely one
                     else:    
                         relevantPorts[relDev] = [port for port in COM_ports 
-                                                 if ("USB" in port 
+                                                 if (("USB" in port or "ttyS" in port) 
                                                      and ( (relDev in failedAttempts.keys() and port not in failedAttempts[relDev]) or 
                                                            relDev not in failedAttempts.keys()
                                                          )
@@ -210,7 +210,7 @@ class SerialConnector:
                         if len(relevantPorts[relDev]) == 0:
                             failedAttempts[relDev] = []
                             relevantPorts[relDev] = [port for port in COM_ports
-                                                     if ("USB" in port and port not in usedPorts)
+                                                     if (("USB" in port or "ttyS" in port) and port not in usedPorts)
                                                     ]
 
                     isDefault = False

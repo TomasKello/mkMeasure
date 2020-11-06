@@ -337,7 +337,23 @@ class Device:
             curr_range = 2e1/res #20nA   
         elif int(bias_point) in range(0,2):
             curr_range = 2e0/res #2nA
-        return curr_range    
+        return curr_range
+
+    def __chargingTime__(self,initBias,targetBias):
+        #######################################################
+        #Calculate charging time to be used in sleep function. 
+        #######################################################
+ 
+        delta = abs(targetBias-initBias)
+        biasStep = 10
+        timeStep = 0.25
+        isRes = delta%biasStep > 0
+        nSteps = 0
+        if isRes:
+            nSteps = int((delta//biasStep)+1.0)
+        else:
+            nSteps = int(delta//biasStep)
+        return nSteps*timeStep     
 
     def __detectMalfunction__(self,motionIsDone,dev_type="zstation"):
         ###########################################################
@@ -758,7 +774,7 @@ class Device:
         #Sensitivity settings
         nSamples = 1            #samples per measurement
         sampleTime = 0.25       #time per sample
-        residualCurrent = 3e-13 #minimum current
+        residualCurrent = 2e-13 #minimum current
         currentStability = 2    #meaning at least 3 positive measurements in semi-automatic mode
 
         #Set remote control
@@ -1146,6 +1162,11 @@ class Device:
         log("i","Turning ON high-voltage source for "+source_dev_info+".")
         self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="ON",vital=True))
 
+        #Accomodating for charging time
+        log("i","Charging time...")
+        time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+        log("i","Released.") 
+
         #Read out enviro data
         enviro = {}
         preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
@@ -1331,13 +1352,21 @@ class Device:
 
         #Loop over bias values
         results = { 'data' : [], 'enviro' : [] }
-        for biasPoint in biasRange:
+        for ibias,biasPoint in enumerate(biasRange):
             #Set Bias
             self.__write__(self.__cmd__(self.coms[source_dev],"SVOLT",arg=str(biasPoint),vital=True))
             if self.args.verbosity > 0:
                 setBias = self.__read__(self.__cmd__(self.coms[source_dev],"VOLT?"))
                 if setBias:
                     log("i","Voltage set: "+str(setBias)+".")
+
+            #Accomodating for charging time
+            log("i","Charging time...")
+            if ibias == 0:
+                time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+            else:
+                time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
+            log("i","Released.")
 
             #Adjusting current range for a measurement device
             self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
