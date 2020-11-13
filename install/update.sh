@@ -6,10 +6,11 @@ cd ../source
 
 #kill running binaries
 runningMacros=`pgrep SensBoxEnv`
-if [ ! -z $runningMacros ]
-then
-    kill `echo $runningMacros`
-fi
+macrosArray=($(echo $runningMacros | tr ' ' "\n"))
+for macro in "${macrosArray[@]}"
+do
+    kill $macro
+done
 
 #create bin arch
 if [ ! -d "../bin/" ]
