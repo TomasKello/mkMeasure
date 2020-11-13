@@ -4,8 +4,8 @@ import sys
 import serial
 import glob
 import time
-
 import ColorLogger
+import DelayedKeyboardInterrupt as warden
 import SerialConnector
 import SocketConnector
 import Device
@@ -150,6 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
     parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
+    parser.add_argument('--debug'      , dest='debug'         , help='Bypass several options.',                  action='store_true',            default=False )
 
     #add immediate one-go functions
     immGroup.add_argument('--term'      , dest='terminate'         , help='Immediately terminate all devices.',                       action='store_true',            default=False )
@@ -304,7 +305,7 @@ if __name__ == '__main__':
         try:
             dev.load(COMS,SOCKETS,EMG) 
         except KeyboardInterrupt:
-            log("i","Keyboard interruption during device loading detected.")
+            log("w","Keyboard interruption during device loading detected.")
             sys.exit(0)
     else:
         allMatched = False
@@ -314,33 +315,33 @@ if __name__ == '__main__':
         while not allMatched:
             COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts)
             log("i","Use CTRL+C to cancel automatic selecion.")
-            try:
-                attempt = dev.load(COMS,SOCKETS,EMG)
-                if "success" in attempt.keys():
-                    allMatched = True
-                else:
-                    for key in attempt.keys():
-                        _port,valid = attempt[key]
-                        if valid == 0:
-                            if key not in failedAttempts.keys():
-                                failedAttempts[key] = []
-                                failedAttempts[key].append(_port)
-                            else:
-                                failedAttempts[key].append(_port)
-                        elif valid == 1:
-                                goodAttempts[key] = _port
-            except KeyboardInterrupt:
-                log("i","Keyboard interruption during device loading detected.")
-                sys.exit(0)
+
+            #Keyboard exception is controlled internally
+            attempt = dev.load(COMS,SOCKETS,EMG)
+            if "success" in attempt.keys():
+                allMatched = True
+            else:
+                for key in attempt.keys():
+                    _port,valid = attempt[key]
+                    if valid == 0:
+                        if key not in failedAttempts.keys():
+                            failedAttempts[key] = []
+                            failedAttempts[key].append(_port)
+                        else:
+                            failedAttempts[key].append(_port)
+                    elif valid == 1:
+                            goodAttempts[key] = _port
 
     #-----------------------------------------------------------------
-    #Raise emergency functions here
+    #Raise argument invoked emergency functions here
     #-----------------------------------------------------------------
     if args.terminate: 
-        dev.terminate()
-    if args.abort:     
-        dev.abort()
-        dev.terminate()
+        with warden.DelayedKeyboardInterrupt(force=False):
+            dev.terminate()
+    if args.abort:
+        with warden.DelayedKeyboardInterrupt(force=False):     
+            dev.abort()
+            dev.terminate()
 
     #-----------------------------------------------------------------
     #Initialize current sensing until connection is achieved
@@ -351,15 +352,22 @@ if __name__ == '__main__':
         else:
             biasRingConnected = dev.sense(connectTimeError=0)
     except KeyboardInterrupt:
-        log("i","Keyboard interruption during sensing mode detected.")
-        sys.exit(0)
+        log("w","Keyboard interruption during sensing mode detected.")
+        with warden.DelayedKeyboardInterrupt(force=False): 
+            dev.abort()
+            dev.terminate()
     if not biasRingConnected:
         sys.exit(0)
 
     #-----------------------------------------------------------------
     #Check initial environment conditions and closed box
     #-----------------------------------------------------------------
-    boxReady = dev.box()
+    try:
+        boxReady = dev.box()
+    except KeyboardInterrupt:
+        log("w","Keyboard interruption during box crosscheck detected.")
+        with warden.DelayedKeyboardInterrupt(force=False):
+            dev.terminate()
     if not boxReady:
         sys.exit(0)
 
@@ -419,8 +427,14 @@ if __name__ == '__main__':
     for iseq,seq in enumerate(sequence):
         if 'singleIV' in seq['type']:
             _results = { 'type' : seq['type'], 'data' : [], 'enviro' : []}
-            if 'bias' in seq and seq['bias'][0] > 0.:
-                current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0])
+            if 'bias' in seq and abs(seq['bias'][0]) > 0.:
+                try:
+                    current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0])
+                except KeyboardInterrupt:
+                    log("w","Keyboard interruption during single measurement detected!")
+                    with warden.DelayedKeyboardInterrupt(force=False):
+                        dev.abort()
+                        dev.terminate()
                 if bias != None:
                     _results['data'].append((current,bias))
                     _results['enviro'].append(enviro)
@@ -438,7 +452,13 @@ if __name__ == '__main__':
                 log("i","Bias voltage = 0 V. Doing nothing...")
         elif 'contIV' in seq['type']:
             if  'bias' in seq:
-                _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                try:
+                    _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                except KeyboardInterrupt:
+                    log("w","Keyboard interruption during continuous measurement detected!")
+                    with warden.DelayedKeyboardInterrupt(force=False):
+                        dev.abort()
+                        dev.terminate()
                 if len(_results['data']) > 0:
                     log("i","#"+str(iseq)+" RESULTS CONTINUOUS:")
                     log("i","-----------------")
@@ -461,7 +481,13 @@ if __name__ == '__main__':
 
         elif 'multiIV' in seq['type']:
             if  'bias' in seq:
-                _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                try:
+                    _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                except KeyboardInterrupt:
+                    log("w","Keyboard interruption during multi measurement detected!")
+                    with warden.DelayedKeyboardInterrupt(force=False):
+                        dev.abort()
+                        dev.terminate()
                 if len(_results['data']) > 0:
                     log("i","#"+str(irep)+" RESULTS MULTIPLE POINT:")
                     log("i","-----------------")

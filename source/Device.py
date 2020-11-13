@@ -5,6 +5,7 @@ import time
 import datetime as dt
 import importlib
 import ColorLogger
+import DelayedKeyboardInterrupt as warden
 
 def log(log_type="i",text=""):
     clogger = ColorLogger.ColorLogger("Device:          ")
@@ -272,10 +273,11 @@ class Device:
                 isNegative = False
             if float(bias) < 0:
                 isPositive = False
-        if isNegative and not isPositive:
-            biasRange.sort(reverse=True)
-        else:
-            biasRange.sort()
+        if not self.args.debug:
+            if isNegative and not isPositive:
+                biasRange.sort(reverse=True)
+            else:
+                biasRange.sort()
             
         #Check value    
         _biasRange = []
@@ -283,7 +285,10 @@ class Device:
             correct_bias = self.__checkBias__(com,bias)
             if len(_biasRange) > 0:
                 if str(correct_bias) == str(_biasRange[-1]):
-                    continue
+                    if not self.args.debug:
+                        continue
+                    else:
+                        _biasRange.append(correct_bias)
                 else:
                     _biasRange.append(correct_bias)
             else:    
@@ -345,6 +350,7 @@ class Device:
         #######################################################
  
         delta = abs(targetBias-initBias)
+        offset = 1.0
         biasStep = 10
         timeStep = 0.25
         isRes = delta%biasStep > 0
@@ -353,7 +359,7 @@ class Device:
             nSteps = int((delta//biasStep)+1.0)
         else:
             nSteps = int(delta//biasStep)
-        return nSteps*timeStep     
+        return (nSteps*timeStep)+offset     
 
     def __detectMalfunction__(self,motionIsDone,dev_type="zstation"):
         ###########################################################
@@ -666,7 +672,7 @@ class Device:
                 setVolt = self.__read__(self.__cmd__(self.coms[dev_type],"VOLT?",vital=_vital))
                 if self.args.verbosity > 1:
                     log("i","Voltage re-set to zero for "+dev_type_info+": "+str(setVolt))    
-            elif "station" in dev_type:    
+            elif "station" in dev_type and dev_type in self.sleep_time.keys():    
                 #stop motor movement if needed
                 self.__write__(self.__cmd__(self.coms[dev_type],"STOP",vital=True))
                 motionIsDone = False
@@ -694,7 +700,7 @@ class Device:
             #SECOND SEQUENCE        
             self.__write__(self.__cmd__(self.coms[dev_type],"ZCHECK",arg="ON"))
             self.__write__(self.__cmd__(self.coms[dev_type],"ZCOR",arg="OFF"))
-            if "station" in dev_type:
+            if "station" in dev_type and dev_type in self.sleep_time.keys():
                 #turn OFF motor        
                 self.__write__(self.__cmd__(self.coms[dev_type],"MOTOR",arg="OFF",vital=True))
                 time.sleep(self.sleep_time[dev_type]['medium'])
@@ -720,35 +726,39 @@ class Device:
         #COMS    = serial connections
         #SOCKETS = socket connections 
         ########################################################
-        DEV_MEAS_NAME,self.coms['meas'] = self.__getResponse__(COMS['meas']) 
-        if self.args.extVSource:
-            DEV_SOURCE_NAME,self.coms['source'] = self.__getResponse__(COMS['source'])
-        OTHER_DEV_NAMES = {}
-        for dev_type in self.args.addPort:
-            OTHER_DEV_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(COMS[dev_type])
-        for dev_type in self.args.addSocket:    
-            DEV_PROBE_NAME,self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])
+        try:
+            DEV_MEAS_NAME,self.coms['meas'] = self.__getResponse__(COMS['meas']) 
+            if self.args.extVSource:
+                DEV_SOURCE_NAME,self.coms['source'] = self.__getResponse__(COMS['source'])
+            OTHER_DEV_NAMES = {}
+            for dev_type in self.args.addPort:
+                OTHER_DEV_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(COMS[dev_type])
+            for dev_type in self.args.addSocket:    
+                DEV_PROBE_NAME,self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])
       
-        loadStatus = {}
-        if "FAILED" in DEV_MEAS_NAME:
-            loadStatus['meas'] = (self.coms['meas']['port'],0)
-        else:
-            loadStatus['meas'] = (self.coms['meas']['port'],1)            
-        if self.args.extVSource and "FAILED" in DEV_SOURCE_NAME:
-            loadStatus['source'] = (self.coms['source']['port'],0)
-        elif self.args.extVSource and "FAILED" not in DEV_SOURCE_NAME:
-            loadStatus['source'] = (self.coms['source']['port'],1)
-        for dev_type in self.args.addPort:
-            if "FAILED" in OTHER_DEV_NAMES[dev_type]:
-                loadStatus[dev_type] = (self.coms[dev_type]['port'],0)
+            loadStatus = {}
+            if "FAILED" in DEV_MEAS_NAME:
+                loadStatus['meas'] = (self.coms['meas']['port'],0)
             else:
-                loadStatus[dev_type] = (self.coms[dev_type]['port'],1)
-        allOK = True        
-        for key in loadStatus.keys():
-            port,valid = loadStatus[key]
-            if valid == 0:
-                allOK = False 
-        if not allOK: return loadStatus
+                loadStatus['meas'] = (self.coms['meas']['port'],1)            
+            if self.args.extVSource and "FAILED" in DEV_SOURCE_NAME:
+                loadStatus['source'] = (self.coms['source']['port'],0)
+            elif self.args.extVSource and "FAILED" not in DEV_SOURCE_NAME:
+                loadStatus['source'] = (self.coms['source']['port'],1)
+            for dev_type in self.args.addPort:
+                if "FAILED" in OTHER_DEV_NAMES[dev_type]:
+                    loadStatus[dev_type] = (self.coms[dev_type]['port'],0)
+                else:
+                    loadStatus[dev_type] = (self.coms[dev_type]['port'],1)
+            allOK = True        
+            for key in loadStatus.keys():
+                port,valid = loadStatus[key]
+                if valid == 0:
+                    allOK = False 
+            if not allOK: return loadStatus
+        except KeyboardInterrupt:
+            log("w","Keyboard interruption during port selection detected.")
+            sys.exit(0)
 
         #-----------------------------------------------------------------------------------------------
         #From now on one can write/read commands in Device under 
@@ -759,8 +769,13 @@ class Device:
         #    self.devs[COM['id']].subroutine()
         #-----------------------------------------------------------------------------------------------
 
-        #Initialize sequence 
-        self.__initDevice__(self.coms,EMG)
+        #Initialize sequence
+        try:
+            self.__initDevice__(self.coms,EMG)
+        except KeyboardInterrupt:
+            log("w","Keyboard interruption during device initialization detected.")
+            with warden.DelayedKeyboardInterrupt(force=False): 
+                self.__terminate__("EXIT")
 
         #Return success if all is OK
         return { 'success' : 1 }
@@ -834,6 +849,11 @@ class Device:
             isConnected = False
             while not isConnected:
                 userInput = log("tt","Press \"y\" to test connection: ")
+                try:
+                    userInput.lower()
+                except AttributeError:
+                    log("w","Common! I said press \"n\" to cancel...")
+                    userInput = ""
                 if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["y","f"]:
                     if fullManual or userInput.lower().split(" ")[0] == "f":
                         isConnected = True
@@ -1360,13 +1380,14 @@ class Device:
                 if setBias:
                     log("i","Voltage set: "+str(setBias)+".")
 
-            #Accomodating for charging time
-            log("i","Charging time...")
-            if ibias == 0:
-                time.sleep(self.__chargingTime__(0.,float(biasPoint)))
-            else:
-                time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
-            log("i","Released.")
+            if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) == 0:
+                #Accomodating for charging time
+                log("i","Charging time...")
+                if ibias == 0:
+                    time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+                else:
+                    time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
+                log("i","Released.")
 
             #Adjusting current range for a measurement device
             self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
@@ -1406,6 +1427,14 @@ class Device:
             readout = ""
             self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
             self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False))                                 #Initialize trigger on source if needed
+            if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) != 0:
+                #Accomodating for charging time
+                log("i","Charging time...")
+                if ibias == 0:
+                    time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+                else:
+                    time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
+                log("i","Released.")             
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
             time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
             self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
