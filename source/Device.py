@@ -503,7 +503,8 @@ class Device:
         #Run sequence of commands in order to prepare measurement device 
         #(and external source) for particular measurement. In case of
         #very particular sub-routines required by device, these are
-        #invoked from here.
+        #invoked from here. Called only for the first measurement of 
+        #IV type.
         ################################################################
 
         #Inform about power-on settings
@@ -1066,18 +1067,18 @@ class Device:
         log("i","Initial environmental conditions, HV inhibitor and TestBox checked.")    
         return True
 
-    def single(self, mtype="IV", mpoint=0, sampleTime=0.50, nSamples=5):
+    def single(self, mtype="IV", mpoint=0, sampleTime=0.50, nSamples=5, isLast=True, isFirst=False):
         #######################################
         #Alias for all single type measurements
         #######################################
 
         if "IV" in mtype:
-            return self.singleIV(biasPoint=mpoint, sampleTime=sampleTime, nSamples=nSamples)
+            return self.singleIV(biasPoint=mpoint, sampleTime=sampleTime, nSamples=nSamples, isLast=isLast, isFirst=isFirst)
         else:
             log("f","Unknown single measurement type.")
             sys.exit(0)
         
-    def singleIV(self, biasPoint=0, sampleTime=0.50, nSamples=5):
+    def singleIV(self, biasPoint=0, sampleTime=0.50, nSamples=5, isLast=True, isFirst=False):
         #############################################################
         #Global function called from mkMeasure defining basic single
         #bias measurement. Particular device commands are read from
@@ -1110,8 +1111,9 @@ class Device:
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)  
 
-        #Prepare device before each measurement
-        self.__prepMeasurement__()
+        #Prepare device before first measurement
+        if isFirst:
+            self.__prepMeasurement__()
 
         #Adjusting voltage range
         _range = "1"
@@ -1218,8 +1220,9 @@ class Device:
         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
 
-        #Return z-station to bottom position before finalizing measurement
-        if 'zstation' in self.coms:
+        #Return z-station to bottom position before finalizing measurement if it is last IV measurement
+        if 'zstation' in self.coms and isLast:
+            log("i","Cleaning after last measurement")
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
             motionIsDone = False
             runTime = 0.
@@ -1232,7 +1235,10 @@ class Device:
                 runTime += self.sleep_time['zstation']['long']
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
-            log("h","Probe is still touching sensor!")
+            if not isLast:
+                log("w","Probe is still touching sensor! Another measurement continues.") 
+            else: 
+                log("h","Probe is still touching sensor!")
 
         #Process and return results
         if len(readout) == 0:
@@ -1264,23 +1270,28 @@ class Device:
         #Run post routine if there is one specified
 
         #Finalize measurement
-        self.__terminate__()
+        if isLast: 
+            try: 
+                self.__terminate__()
+            except OSError:
+                log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                log("h","Manual abort required.")
 
         #Return to mkMeasure
         return current, biasPoint, enviro
 
-    def continuous(self, mtype="IV", mrange=[], sampleTime=0.50, nSamples=5): 
+    def continuous(self, mtype="IV", mrange=[], sampleTime=0.50, nSamples=5, isLast=True, isFirst=False): 
         ##########################################
         #Alias for all continuos type measurements
         ##########################################
 
         if "IV" in mtype:
-            return self.continuousIV(biasRange=mrange, sampleTime=sampleTime, nSamples=nSamples)
+            return self.continuousIV(biasRange=mrange, sampleTime=sampleTime, nSamples=nSamples, isLast=isLast, isFirst=isFirst)
         else:
             log("f","Unknown continuous measurement type.")
             sys.exit(0)
 
-    def continuousIV(self, biasRange, sampleTime, nSamples):
+    def continuousIV(self, biasRange, sampleTime, nSamples, isLast=True, isFirst=False):
         ###############################################################
         #Global function called from mkMeasure performs the multi-point
         #bias measurement. Particular device commands are read from the
@@ -1317,8 +1328,9 @@ class Device:
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
-        #Prepare device before each measurement
-        self.__prepMeasurement__()
+        #Prepare device before first measurement
+        if isFirst:
+            self.__prepMeasurement__()
 
         #Adjusting voltage range
         _range = "1"
@@ -1371,6 +1383,7 @@ class Device:
         self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="ON",vital=True))    
 
         #Loop over bias values
+        currentOverflow = False
         results = { 'data' : [], 'enviro' : [] }
         for ibias,biasPoint in enumerate(biasRange):
             #Set Bias
@@ -1472,8 +1485,15 @@ class Device:
             results['data'].append((current,biasPoint))    
             results['enviro'].append(enviro)
 
+            #Emergency break loop in case of amps exceeding maximum level
+            #TODO: read value from library 
+            if current > 100e-6: 
+                currentOverflow = True
+                break
+
         #Return z-station to bottom position before finalizing measurement
-        if 'zstation' in self.coms:
+        if ('zstation' in self.coms and isLast) or ('zstation' in self.coms and currentOverflow):
+            log("i","Cleaning after last measurement") 
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
             motionIsDone = False
             runTime = 0.
@@ -1486,15 +1506,23 @@ class Device:
                 runTime += self.sleep_time['zstation']['long']
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
-            log("h","Probe is still touching sensor!")
+            if not isLast:
+                log("w","Probe is still touching sensor! Another measurement continues.")
+            else: 
+                log("h","Probe is still touching sensor!")
 
         #Finalize measurement
-        self.__terminate__()
+        if isLast or currentOverflow:
+            try:
+                self.__terminate__()
+            except OSError:
+                log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                log("h","Manual abort required.")
 
         #Return to mkMeasure
         return results
 
-    def multiIV(self, biasRange, sampleTime, nSamples):
+    def multiIV(self, biasRange, sampleTime, nSamples, isLast=True, isFirst=False):
         ################################################################
         #Global function called from mkMeasure performs the multi-point
         #bias measurement. Particular device commands are read from the
@@ -1527,9 +1555,21 @@ class Device:
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
         #Loop over bias points
-        results = { 'data' : [], 'enviro' : [] }    
-        for biasPoint in biasRange:
-            current, bias, enviro = self.singleIV(biasPoint, sampleTime, nSamples)
+        results = { 'data' : [], 'enviro' : [] }  
+        isLastLocal=True
+        isFirstLocal=False   
+        for ibias,biasPoint in enumerate(biasRange):
+            if isLast and ibias != len(biasRange)-1:
+                isLastLocal = False
+            elif isLast and ibias == len(biasRange)-1:
+                isLastLocal = True
+            elif not isLast:
+                isLastLocal = False
+            if isFirst and ibias == 0:
+                isFirstLocal = True
+            else:
+                isFirstLocal = False    
+            current, bias, enviro = self.singleIV(biasPoint, sampleTime, nSamples, isLast=isLastLocal, isFirst=isFirstLocal)
             results['data'].append((current,bias))
             results['enviro'].append({ 'temp1' : enviro[0],
                                        'temp2' : enviro[1],

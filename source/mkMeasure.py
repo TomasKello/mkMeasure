@@ -425,11 +425,19 @@ if __name__ == '__main__':
         log("i","Alternatively pass configuration file using --cfg <config_file>.")
         sys.exit(0)
     for iseq,seq in enumerate(sequence):
+        def isIV():
+            subsequence = sequence[iseq:]
+            for subseq in subsequence:
+                if "singleIV" in subseq['type'] or "contIV" in subseq['type']:
+                    return True
+            return False
+        isLast = (iseq == len(sequence)-1 or not isIV())
+        isFirst = (iseq == 0) 
         if 'singleIV' in seq['type']:
             _results = { 'type' : seq['type'], 'data' : [], 'enviro' : []}
             if 'bias' in seq and abs(seq['bias'][0]) > 0.:
                 try:
-                    current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0])
+                    current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during single measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False):
@@ -453,7 +461,7 @@ if __name__ == '__main__':
         elif 'contIV' in seq['type']:
             if  'bias' in seq:
                 try:
-                    _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                    _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during continuous measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False):
@@ -482,7 +490,7 @@ if __name__ == '__main__':
         elif 'multiIV' in seq['type']:
             if  'bias' in seq:
                 try:
-                    _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'])
+                    _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during multi measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False):
