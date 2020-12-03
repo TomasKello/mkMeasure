@@ -4,6 +4,7 @@ import sys
 import serial
 import glob
 import time
+import datetime
 import ColorLogger
 import DelayedKeyboardInterrupt as warden
 import SerialConnector
@@ -15,8 +16,24 @@ import InputParser
 #constants
 delim = '\n'
 
+def _date():
+    _date = datetime.datetime.now()
+    month = str(_date.month)
+    day = str(_date.day)
+    hour = str(_date.hour)
+    minute = str(_date.minute)
+    second = str(_date.second)
+    if len(str(_date.month)) == 1: month = "0"+str(_date.month)
+    if len(str(_date.day)) == 1: day = "0"+str(_date.day)
+    if len(str(_date.hour)) == 1: hour = "0"+str(_date.hour)
+    if len(str(_date.minute)) == 1: minute = "0"+str(_date.minute)
+    if len(str(_date.second)) == 1: second = "0"+str(_date.second)
+    
+    return str(_date.year)+month+day+"_"+hour+minute+second
+_logname = _date()+".txt"
+
 def log(log_type="i",text=""):
-    clogger = ColorLogger.ColorLogger("mkMeasure:       ")
+    clogger = ColorLogger.ColorLogger("mkMeasure:       ",_logname)
     return clogger.log(log_type,text)
 
 def range_list(arg_value):
@@ -136,6 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--outputDir', dest='outputDir', type=str, help='Output directory.', action='store', default="results" )
     parser.add_argument('--txt',  dest='outTXT', help='Produce output in txt format.',                 action='store_true', default=False )
     parser.add_argument('--json',  dest='outJSON', help='Produce output in json format.',                 action='store_true', default=False )
+    parser.add_argument('--csv',  dest='outCSV', help='Produce output in csv format.',                 action='store_true', default=False )
     parser.add_argument('--xml',  dest='outXML', help='Produce output in xml format.',                 action='store_true', default=False )
     parser.add_argument('--root', dest='outROOT', help='Produce output in root format.',               action='store_true', default=False )
     parser.add_argument('--png',  dest='outPNG', help='Produce output in png format.',                 action='store_true', default=False )
@@ -147,6 +165,7 @@ if __name__ == '__main__':
     measGroup.add_argument('-s','--single', nargs=1, type=float, dest='single', metavar='<bias>' , help='Single IV measurement. USAGE: -s 60.5', action='store', default=None)
     measGroup.add_argument('-m','--multi',      type=range_list, dest='multi' , metavar='<bias_range>'  , help='Multiple point IV measurement. USAGE: -m start end incr OR -c [1,2,3,4]', action='store', default=None)
     measGroup.add_argument('-c','--continuous', type=range_list, dest='continuous', metavar='<bias_range>', help='Continuous IV measurement. USAGE: -c start end incr OR -c [1,2,3,4]', action='store', default=None)
+    measGroup.add_argument('-e','--enviro', type=str, dest='enviro', metavar='<enviro>' , help='Enviro readings: all, temp, humi or lumi.', action='store', default=None)
     parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
     parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
@@ -166,6 +185,7 @@ if __name__ == '__main__':
     #--------------------
     exe = sys.executable
     exeDir = exe[:exe.rfind("/")]
+    args.logname = _logname
 
     #!!!!EMG!!!!
     EMG = False
@@ -182,6 +202,7 @@ if __name__ == '__main__':
         args.testPort   = False
         args.testMeas   = False
         args.testStatus = False
+        args.isEnviroOnly = False
     else:
         #Create used-config mirror in case of EMG
         mirror = open(exeDir+"/mirror.py", "w")
@@ -191,7 +212,7 @@ if __name__ == '__main__':
     #!!!!EMG!!!!
 
     isOut = False
-    if (args.outTXT or args.outXML or args.outROOT or args.outPNG or args.outPDF) and not EMG:
+    if (args.outTXT or args.outXML or args.outROOT or args.outPNG or args.outPDF or args.outCSV) and not EMG:
         isOut = True
     if isOut:
         if args.isDB:
@@ -236,13 +257,19 @@ if __name__ == '__main__':
                                    })
             if args.continuous is not None:   
                 for ir in range(1,args.repeat+1):
-                    print(args.continuous)
                     sequence.append({
                                        'type'        : "contIV",
                                        'bias'        : args.continuous,
                                        'sampleTime'  : args.sampleTime,
                                        'nSamples'    : args.nSamples
                                    })
+            if args.enviro is not None:
+                for ir in range(1,args.repeat+1):
+                    sequence.append({
+                                       'type'        : "singleENV",
+                                       'subtype'     : str(args.enviro),
+                                   }) 
+ 
         if len(sequence) == 0 and not args.testPort and not args.testMeas:
             log("i","No measurement tool was selected. Please select measurement inline (-s | -m | -c).")
             log("i","Alternatively pass configuration file using --cfg <config_file>.")
@@ -258,6 +285,18 @@ if __name__ == '__main__':
                 elif 'bias' in seq and len(seq['bias']) < len(seq[varToCheck]):
                         log("e","Option --"+varToCheck+" is specified for more range points than given.")
                         sys.exit(0)
+            if 'subtype' in seq and seq['subtype'] not in ["all","temp","humi","lumi"]:
+                log("e","Unknown environmental reading requested.")
+                sys.exit(0)  
+         
+        #---------------------------------------
+        #Do not initialize all devices if only
+        #enviro readings are invoked
+        #---------------------------------------
+        _isEnviroOnly = False
+        if len(sequence) == 1 and "ENV" in sequence[0]['type']:
+            _isEnviroOnly = True
+        args.isEnviroOnly = _isEnviroOnly
 
     #---------------------------------------
     #Initialize connector and device classes
@@ -265,7 +304,7 @@ if __name__ == '__main__':
     connectorSerial = SerialConnector.SerialConnector(args)
     connectorSocket = SocketConnector.SocketConnector(args)
     dev             = Device.Device(args)
-
+    
     #-------------------------
     #1: PORT AVAILABILITY TEST
     #-------------------------
@@ -285,12 +324,14 @@ if __name__ == '__main__':
     doRetry = False
     if not args.selectPort:
         doRetry = True
-
     if not doRetry:    
         #----------------------------------------------------------------
         #Detect RS232 ports, setup and open connections stored under COMS
         #----------------------------------------------------------------
-        COMS = connectorSerial.connect_RS232()
+        if not args.isEnviroOnly:
+            COMS = connectorSerial.connect_RS232()
+        else: 
+            COMS = {} 
 
         #--------------------------------------------------
         #Detect hosts and ports allowing socket interchange
@@ -303,11 +344,14 @@ if __name__ == '__main__':
         #selected.
         #-----------------------------------------------------------------
         try:
-            dev.load(COMS,SOCKETS,EMG) 
+            if not args.isEnviroOnly:
+                dev.load(COMS,SOCKETS,EMG)
+            else:
+                dev.load_socket(SOCKETS,EMG) 
         except KeyboardInterrupt:
             log("w","Keyboard interruption during device loading detected.")
             sys.exit(0)
-    else:
+    elif doRetry and not args.isEnviroOnly:
         allMatched = False
         SOCKETS = connectorSocket.gateway()
         failedAttempts = {}
@@ -332,16 +376,49 @@ if __name__ == '__main__':
                     elif valid == 1:
                             goodAttempts[key] = _port
 
+    else:
+        SOCKETS = connectorSocket.gateway()
+        try:
+            dev.load_socket(SOCKETS,EMG)
+        except KeyboardInterrupt:
+            log("w","Keyboard interruption during device loading detected.")
+            sys.exit(0)
+
     #-----------------------------------------------------------------
     #Raise argument invoked emergency functions here
     #-----------------------------------------------------------------
     if args.terminate: 
-        with warden.DelayedKeyboardInterrupt(force=False):
+        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
             dev.terminate()
     if args.abort:
-        with warden.DelayedKeyboardInterrupt(force=False):     
+        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):     
             dev.abort()
             dev.terminate()
+
+    #------------------------------------
+    #Output Handler
+    #------------------------------------
+    if isOut:
+        outputHandler = OutputHandler.OutputHandler(args)
+
+    #-----------------------------------------------------------------
+    #Provide standalone enviro measurement here if only one
+    #-----------------------------------------------------------------
+    if args.isEnviroOnly:
+        try:
+            _result = dev.singleENV(str(sequence[0]['subtype']),isLast=True,isFirst=True)
+            dev.finalize()
+            if isOut: 
+                _results = { 'type' : sequence[0]['type'], 'data' : [], 'enviro' : [] }
+                _results['enviro'].append(_result) 
+                outputHandler.load(0,_results)    
+                outputHandler.save()
+        except KeyboardInterrupt:
+            log("w","Keyboard interruption during standalone enviro measurement detected!")
+            with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                dev.abort()
+                dev.terminate()
+        sys.exit(0) 
 
     #-----------------------------------------------------------------
     #Initialize current sensing until connection is achieved
@@ -353,7 +430,7 @@ if __name__ == '__main__':
             biasRingConnected = dev.sense(connectTimeError=0)
     except KeyboardInterrupt:
         log("w","Keyboard interruption during sensing mode detected.")
-        with warden.DelayedKeyboardInterrupt(force=False): 
+        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname): 
             dev.abort()
             dev.terminate()
     if not biasRingConnected:
@@ -366,7 +443,7 @@ if __name__ == '__main__':
         boxReady = dev.box()
     except KeyboardInterrupt:
         log("w","Keyboard interruption during box crosscheck detected.")
-        with warden.DelayedKeyboardInterrupt(force=False):
+        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
             dev.terminate()
     if not boxReady:
         sys.exit(0)
@@ -411,12 +488,6 @@ if __name__ == '__main__':
     #-------------------------
     #TODO
 
-    #------------------------------------
-    #Output Handler
-    #------------------------------------
-    if isOut:
-        outputHandler = OutputHandler.OutputHandler(args)
-
     #-------------------------
     #       MANUAL MODE
     #-------------------------
@@ -440,7 +511,7 @@ if __name__ == '__main__':
                     current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during single measurement detected!")
-                    with warden.DelayedKeyboardInterrupt(force=False):
+                    with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
                         dev.abort()
                         dev.terminate()
                 if bias != None:
@@ -464,7 +535,7 @@ if __name__ == '__main__':
                     _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during continuous measurement detected!")
-                    with warden.DelayedKeyboardInterrupt(force=False):
+                    with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
                         dev.abort()
                         dev.terminate()
                 if len(_results['data']) > 0:
@@ -493,7 +564,7 @@ if __name__ == '__main__':
                     _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
                     log("w","Keyboard interruption during multi measurement detected!")
-                    with warden.DelayedKeyboardInterrupt(force=False):
+                    with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
                         dev.abort()
                         dev.terminate()
                 if len(_results['data']) > 0:
@@ -515,6 +586,23 @@ if __name__ == '__main__':
                     log("f","Measurement failed but should not reach this point.")
             else:
                 log("e","Bias range not defined!")
+
+        elif 'singleENV' in seq['type']:
+            _results = { 'type' : seq['type'], 'data' : [], 'enviro' : [] } 
+            if 'subtype' in seq:
+                try:
+                    _results['enviro'].append( dev.singleENV(str(seq['subtype'],isLast=isLast,isFirst=isFirst)) )
+                except KeyboardInterrupt:
+                    log("w","Keyboard interruption during standalone enviro measurement detected!")
+                    with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                        dev.abort()
+                        dev.terminate()
+                if len(_results['enviro']) > 0:
+                    if isOut:
+                        _results['type'] = seq['type']
+                        outputHandler.load(iseq,_results)
+            else:
+                log("e","Environmental measurement not defined!")
 
     #-------------------------------------
     #Finalize devices after full sequence

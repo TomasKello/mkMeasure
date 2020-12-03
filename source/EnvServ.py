@@ -59,15 +59,15 @@ cmds['do'] = { 'CMDINIT' : { 'cmd' : "", 'vital' : False},              #@Some d
 #----------------------PARAMETERS----------------------#
 ########################################################
 
-pars = { 'tShort'  : { 'par' :  0.08, 'vital' : True, 'alt' : "" },                  #@Basic sleep time in seconds needed for proper running of device routines
-         'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                  #@Medium sleep time  
-         'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                  #@Long sleep time
-         'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},             #@Readout for each sample is devided by this character
-         'interlockCheckable' : { 'par' : False, 'vital' : True, 'alt' : ""},       #@Checkability of interlock status
-         'remoteCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},       #@Checkability of remote control
-         'vlimitCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},       #@Checkability of voltage limits
-         'reqTemp' : { 'par' : {'min' : 16., 'max' : 19.5}, 'vital' : True, 'alt' : ""}, #@Required temperature interval
-         'reqHumi' : { 'par' : {'min' : 0., 'max' : 10.0}, 'vital' : True, 'alt' : ""},  #@Required humidity interval
+pars = { 'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                        #@Basic sleep time in seconds needed for proper running of device routines
+         'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                        #@Medium sleep time  
+         'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                        #@Long sleep time
+         'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},                   #@Readout for each sample is devided by this character
+         'interlockCheckable' : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of interlock status
+         'remoteCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of remote control
+         'vlimitCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of voltage limits
+         'reqTemp' : { 'par' : {'min' : 16., 'max' : 24.5}, 'vital' : True, 'alt' : ""},  #@Required temperature interval
+         'reqHumi' : { 'par' : {'min' : 0., 'max' : 40.0}, 'vital' : True, 'alt' : ""},   #@Required humidity interval
          'reqLumi' : { 'par' : {'min' : 0., 'max' : 0.001}, 'vital' : True, 'alt' : ""},  #@Required lumi interval
 }
 
@@ -79,9 +79,9 @@ class EnvServ():
         #Device-specific class for KEITHLEY model K6517A
         ################################################
         self.delim = '\r\n'
-        self.sleep_time = 0.10 #FIXME: read from par
-        self.medium_sleep_time = 1.0
-        self.long_sleep_time = 3.0 
+        self.sleep_time = pars['tShort']['par']
+        self.medium_sleep_time = pars['tMedium']['par']
+        self.long_sleep_time = pars['tLong']['par']
         now = dt.datetime.now()
         self.year = str(now.year)
         self.month = str(now.month)
@@ -92,11 +92,11 @@ class EnvServ():
         #TODO: run selfcheck on cmds: if 'cmd' is empty, set 'vital' to False, then add crosscheck in self.cmd
 
         #run server
-        import subprocess
-        exe = sys.executable
-        exeDir = exe[:exe.rfind("/")]
-        subprocess.Popen([exeDir+"/SensBoxEnv"])
-        time.sleep(5)
+        #import subprocess
+        #exe = sys.executable
+        #exeDir = exe[:exe.rfind("/")]
+        #subprocess.Popen([exeDir+"/SensBoxEnvSer"])
+        #time.sleep(5)
 
     def test(self):
         ######################################################
@@ -164,6 +164,7 @@ class EnvServ():
             except ConnectionRefusedError:
                 return "REFUSED"
             s.sendall(cmd.encode())
+            time.sleep(self.sleep_time) 
             write_status = True
 
         return write_status    
@@ -183,6 +184,7 @@ class EnvServ():
             except ConnectionRefusedError:
                 return "REFUSED"
             s.sendall(cmd.encode())
+            time.sleep(self.sleep_time)
             return_value = s.recv(1024)
 
         return return_value.decode().rstrip()

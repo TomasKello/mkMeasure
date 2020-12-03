@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['mkMeasure.py'],
              pathex=['/home/pi/mkMeasure/source'],
-             binaries=[('SensBoxEnv','.')],
+             binaries=[('SensBoxEnvSer','.')],
              datas=[],
              hiddenimports=['KEITHLEY','ESP100','NHQ201','EnvServ'],
              hookspath=[],

@@ -5,13 +5,17 @@ import serial
 import glob
 import ColorLogger
 
-def log(log_type="i",text=""):
-    clogger = ColorLogger.ColorLogger("SerialConnector: ")
-    return clogger.log(log_type,text)
+#def log(log_type="i",text=""):
+#    clogger = ColorLogger.ColorLogger("SerialConnector: ")
+#    return clogger.log(log_type,text)
 
 class SerialConnector:
     def __init__(self,args):
         self.args = args
+        self.clogger = ColorLogger.ColorLogger("SerialConnector: ",self.args.logname)
+
+    def log(self,log_type="i",text=""):
+        return self.clogger.log(log_type,text)
 
     def __supported_serial_ports__(self):
         ###############################################
@@ -91,14 +95,14 @@ class SerialConnector:
         # listing serial ports
         COM_ports = self.__supported_serial_ports__()
         if len(COM_ports) == 0:
-            log("e","No RS232 ports found!")
+            self.log("e","No RS232 ports found!")
             sys.exit(0)
         else:
             if self.args.selectPort:
-                log("i","RS232 ports detected:")
+                self.log("i","RS232 ports detected:")
                 for icom, com in enumerate(COM_ports):
-                    log("n","%d) %s"%(int(icom)+1, com))
-                log("n","%d) %s"%(len(COM_ports)+1,"Terminate"))    
+                    self.log("n","%d) %s"%(int(icom)+1, com))
+                self.log("n","%d) %s"%(len(COM_ports)+1,"Terminate"))    
 
         # listing available devices
         devices = self.__detect_devices__()
@@ -107,13 +111,13 @@ class SerialConnector:
         # matching ports to devices 
         if len(COM_ports) == 1:
             if self.args.extVSource:
-                log("w","Not enough serial connections. Cannot use external VSource.")
+                self.log("w","Not enough serial connections. Cannot use external VSource.")
                 self.args.extVSource = False
             for dev_type in self.args.addPort:    
                 if dev_type == "zstation":
-                    log("w","Not enough serial connections. Cannot use motors to enable automotion.")
+                    self.log("w","Not enough serial connections. Cannot use motors to enable automotion.")
                 else:
-                    log("w","Not enough serial connections to connect additional device of type: "+str(dev_type))
+                    self.log("w","Not enough serial connections to connect additional device of type: "+str(dev_type))
             self.args.addPort = []        
             selected_ports['meas'] = devices['meas']
             selected_ports['meas']['port'] = COM_ports[0]
@@ -122,14 +126,14 @@ class SerialConnector:
                 # select main meas device port
                 meas_port_number = 0
                 while (int(meas_port_number) <= 0 or int(meas_port_number) > len(COM_ports)+1): 
-                    log("t","Select port for the main Measurement device:")
-                    meas_port_number = log("tt","[%d - %d]"%(1, len(COM_ports)+1))
+                    self.log("t","Select port for the main Measurement device:")
+                    meas_port_number = self.log("tt","[%d - %d]"%(1, len(COM_ports)+1))
                     try:
                         int(meas_port_number)
                     except ValueError:
                         meas_port_number = 0
                 if int(meas_port_number) == len(COM_ports)+1:
-                    log("i","Measurement terminated by user.")
+                    self.log("i","Measurement terminated by user.")
                     sys.exit(0)
                 selected_ports['meas'] = devices['meas']
                 selected_ports['meas']['port'] = COM_ports[int(meas_port_number)-1]
@@ -138,17 +142,17 @@ class SerialConnector:
                 source_port_number = 0
                 if self.args.extVSource:
                     while (int(source_port_number) <= 0 or int(source_port_number) > len(COM_ports)+1):
-                        log("t","Select port for the external VSource device:")
-                        source_port_number = log("tt","[%d - %d]"%(1, len(COM_ports)+1))
+                        self.log("t","Select port for the external VSource device:")
+                        source_port_number = self.log("tt","[%d - %d]"%(1, len(COM_ports)+1))
                         try:
                             int(source_port_number)
                         except ValueError:
                             source_port_number = 0
                         if source_port_number  == meas_port_number:
-                            log("t","Cannot use the same port!")
+                            self.log("t","Cannot use the same port!")
                             source_port_number = 0
                     if int(source_port_number) == len(COM_ports)+1:
-                        log("i","Measurement terminated by user.")
+                        self.log("i","Measurement terminated by user.")
                         sys.exit(0)
                     selected_ports['source'] = devices['source']    
                     selected_ports['source']['port'] = COM_ports[int(source_port_number)-1]
@@ -158,37 +162,37 @@ class SerialConnector:
                 not_used_devices = []
                 for dev_type in self.args.addPort:
                     if dev_type not in devices:
-                        log("w","Device type: \""+str(dev_type)+"\" NOT specified in device config.")
-                        log("w","Device will not be used.")
+                        self.log("w","Device type: \""+str(dev_type)+"\" NOT specified in device config.")
+                        self.log("w","Device will not be used.")
                         not_used_devices.append(dev_type)
                         continue
                     add_port_number = 0
                     while (int(add_port_number) <= 0 or int(add_port_number) > len(COM_ports)+1):
-                        log("t","Select port for the device of type: "+str(dev_type))
-                        add_port_number = log("tt","[%d - %d]"%(1, len(COM_ports)+1))
+                        self.log("t","Select port for the device of type: "+str(dev_type))
+                        add_port_number = self.log("tt","[%d - %d]"%(1, len(COM_ports)+1))
                         try:
                             int(add_port_number)
                         except ValueError:
                             add_port_number = 0
                         if (add_port_number == meas_port_number) or (add_port_number == source_port_number) or (add_port_number in confirmed_add_port_numbers):
-                            log("t","Cannot use the same port!")
+                            self.log("t","Cannot use the same port!")
                             add_port_number = 0
                     if int(add_port_number) == len(COM_ports)+1:
-                        log("i","Measurement terminated by user.")
+                        self.log("i","Measurement terminated by user.")
                         sys.exit(0)        
                     confirmed_add_port_numbers.append(add_port_number)
                     selected_ports[dev_type] = devices[dev_type]
                     selected_ports[dev_type]['port'] = COM_ports[int(add_port_number)-1]
                 self.args.addPort = [ dev_type for dev_type in self.args.addPort if dev_type not in not_used_devices ]    
             else:
-                log("i","Automatic port selection activated.")
+                self.log("i","Automatic port selection activated.")
                 relevantDevs = [key for key in devices.keys() if ( (key == "source" and self.args.extVSource) or (key in self.args.addPort) or key == "meas" )]
                 relevantPorts = {}
                 usedPorts = []
                 #refresh used ports
                 for relDev in goodAttempts.keys():
                     if self.args.verbosity > 1:
-                        log("i","Adding "+relDev+" to the correctly matched ports.")
+                        self.log("i","Adding "+relDev+" to the correctly matched ports.")
                     usedPorts.append(goodAttempts[relDev])
 
                 #loop over relevant devices and ports
@@ -244,14 +248,14 @@ class SerialConnector:
                             break
 
         if self.args.extVSource:
-            log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
-            log("i","External VSource: ID=%s, port=%s"%(selected_ports['source']['id'],selected_ports['source']['port']))
+            self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
+            self.log("i","External VSource: ID=%s, port=%s"%(selected_ports['source']['id'],selected_ports['source']['port']))
         else:
-            log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
-            log("i","External VSource port: not used")
+            self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
+            self.log("i","External VSource port: not used")
         for key in selected_ports.keys():
             if key not in ['meas','source']:
-                log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port'])) 
+                self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port'])) 
         return selected_ports
 
     def __set_RS232__(self,this_port):
@@ -278,7 +282,7 @@ class SerialConnector:
                 COM.isOpen()
                 return COM
             except serial.SerialException as e:
-                log("e","Cannot open serial port!! "+str(e))
+                self.log("e","Cannot open serial port!! "+str(e))
                 sys.exit(0)
                 #COM = set_RS232_interactive(COM) TODO: in case of wrong settings
 
@@ -299,7 +303,7 @@ class SerialConnector:
             for dev_type in self.args.addPort:
                 COMS[dev_type] = self.__set_RS232__(ports[dev_type])
         except KeyError:
-            log("f","Port selection failed during bit exchange. Repeat selection.")
+            self.log("f","Port selection failed during bit exchange. Repeat selection.")
             sys.exit(0)
     
         #initialize communication
@@ -323,17 +327,17 @@ class SerialConnector:
                 test = True
                 if "source" in ports.keys():
                     if len(ports['source']['port']) != 0:
-                        log("i","Port availability test: SUCCESSFUL")
+                        self.log("i","Port availability test: SUCCESSFUL")
                     else:
-                        log("w","Not enough ports for external VSource.")
-                        log("i","Port availability test: SUCCESSFUL")
+                        self.log("w","Not enough ports for external VSource.")
+                        self.log("i","Port availability test: SUCCESSFUL")
                 else:
-                    log("w","Not enough ports for external VSource.")
-                    log("i","Port availability test: SUCCESSFUL")
+                    self.log("w","Not enough ports for external VSource.")
+                    self.log("i","Port availability test: SUCCESSFUL")
             else:
-                log("e","Port availability test: FAILED")
+                self.log("e","Port availability test: FAILED")
         else:
-            log("e","Port availability test: FAILED")
+            self.log("e","Port availability test: FAILED")
         
         return test
 

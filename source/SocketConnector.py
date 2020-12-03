@@ -3,13 +3,17 @@
 import os, sys
 import ColorLogger
 
-def log(log_type="i",text=""):
-    clogger = ColorLogger.ColorLogger("SocketConnector: ")
-    return clogger.log(log_type,text)
+#def log(log_type="i",text=""):
+#    clogger = ColorLogger.ColorLogger("SocketConnector: ")
+#    return clogger.log(log_type,text)
 
 class SocketConnector:
     def __init__(self,args):
         self.args = args
+        self.clogger = ColorLogger.ColorLogger("SocketConnector: ",self.args.logname)
+       
+    def log(self,log_type="i",text=""):
+        return self.clogger.log(log_type,text)
 
     def __detect_devices__(self):
         ########################################################
@@ -19,7 +23,7 @@ class SocketConnector:
         #FIXME this is hardcoded, should be read from config
         devices = {}
         devices['probe']   = { 'id'       : "EnvServ",
-                               'model'    : "V1.2",
+                               'model'    : "V1.4",
                                'type'     : "probe",
                                'port'     : 9090,
                                'host'     : '127.0.0.1'

@@ -4,14 +4,18 @@ import json
 import importlib
 import ColorLogger
 
-def log(log_type="i",text=""):
-    clogger = ColorLogger.ColorLogger("InputParser:     ")
-    return clogger.log(log_type,text)
+#def log(log_type="i",text=""):
+#    clogger = ColorLogger.ColorLogger("InputParser:     ")
+#    return clogger.log(log_type,text)
 
 class InputParser:
     def __init__(self,args):
         self.args = args
         self.config = []
+        self.clogger = ColorLogger.ColorLogger("InputParser:     ",self.args.logname)
+
+    def log(self,log_type="i",text=""):
+        return self.clogger.log(log_type,text)
 
     def _date(self):
         _date = datetime.datetime.now()
@@ -34,14 +38,14 @@ class InputParser:
             if os.path.exists(altDir+"/"+configFile):
                 os.system("cp "+altDir+"/"+configFile+" "+exeDir)
                 isCopy = True
-                log("i","Reading input config file: "+altDir+"/"+str(configFile))
+                self.log("i","Reading input config file: "+altDir+"/"+str(configFile))
             else:
-                log("e","Configuration file not found.")
+                self.log("e","Configuration file not found.")
                 sys.exit(0)
         else:
             os.system("cp "+configFile+" "+exeDir)
             isCopy = True
-            log("i","Reading input config file: "+str(configFile))
+            self.log("i","Reading input config file: "+str(configFile))
             configFile = configFile[configFile.rfind("/")+1:]
 
         #--------------
@@ -76,16 +80,16 @@ class InputParser:
                                                           'nSamples'   : seq['nSamples']
                                                        })
                             else:
-                                log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
+                                self.log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
                                 sys.exit(0)
                         else:
-                            log("e","Unknown measurement type: "+str(seq['type']))
+                            self.log("e","Unknown measurement type: "+str(seq['type']))
                             sys.exit(0)
                     else:
-                        log("e","Measurement type not specified.")
+                        self.log("e","Measurement type not specified.")
                         sys.exit(0)
             else:
-                log("e","Key word: \"sequence\" required and not found. Measurement sequence is unknown.")
+                self.log("e","Key word: \"sequence\" required and not found. Measurement sequence is unknown.")
                 sys.exit(0)
 
         #--------------
@@ -120,16 +124,16 @@ class InputParser:
                                                           'nSamples'   : seq['nSamples']
                                                        })
                             else:
-                                log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
+                                self.log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
                                 sys.exit(0)
                         else:
-                            log("e","Unknown measurement type: "+str(seq['type']))
+                            self.log("e","Unknown measurement type: "+str(seq['type']))
                             sys.exit(0)
                     else:
-                        log("e","Measurement type not specified.")
+                        self.log("e","Measurement type not specified.")
                         sys.exit(0) 
         else:
-            log("e","Unknown format for input configuration file.")
+            self.log("e","Unknown format for input configuration file.")
             sys.exit(0)
 
         #--------------
@@ -142,11 +146,11 @@ class InputParser:
         #Return config
         #--------------
         if len(self.config) == 0:
-            log("w","No measurement sequence defined.")
+            self.log("w","No measurement sequence defined.")
         else:
             for seq in self.config:
                 if "IV" in seq['type']:
-                    log("i","    TYPE: "+seq['type'])
-                    log("i","        BIAS: "+str(seq['bias']))
+                    self.log("i","    TYPE: "+seq['type'])
+                    self.log("i","        BIAS: "+str(seq['bias']))
         return self.config
 

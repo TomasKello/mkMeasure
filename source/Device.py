@@ -7,9 +7,9 @@ import importlib
 import ColorLogger
 import DelayedKeyboardInterrupt as warden
 
-def log(log_type="i",text=""):
-    clogger = ColorLogger.ColorLogger("Device:          ")
-    return clogger.log(log_type,text)
+#def log(log_type="i",text=""):
+#    clogger = ColorLogger.ColorLogger("Device:          ")
+#    return clogger.log(log_type,text)
 
 class Device:
     def __init__(self,args):
@@ -27,6 +27,10 @@ class Device:
         self.args = args
         self.devs = {}
         self.coms = {}
+        self.clogger = ColorLogger.ColorLogger("Device:          ",self.args.logname)
+
+    def log(self,log_type="i",text=""):
+        return self.clogger.log(log_type,text)
 
     def __getResponse__(self, com):
         #######################################################
@@ -43,23 +47,23 @@ class Device:
             _class = getattr(_mod,com['id']) 
             _devs[com['id']] = _class()
         except ImportError:
-            log("e",com['id']+".py class not found! Please provide dedicated class for this device.")
+            self.log("e",com['id']+".py class not found! Please provide dedicated class for this device.")
             sys.exit(0)
         except AttributeError:
-            log("e",com['id']+" class not specified. Name of the module must match the class name and start with capital letter.")
+            self.log("e",com['id']+" class not specified. Name of the module must match the class name and start with capital letter.")
             sys.exit(0)
         except FileNotFoundError:
-            log("e",com['id']+".py class tried to load non-existing binaries.")
+            self.log("e",com['id']+".py class tried to load non-existing binaries.")
             sys.exit(0)
         except Exception as e:
-            log("f",com['id']+".py class raised an unknown exception! Check for syntax errors.")
-            log("f",str(type(e)))
+            self.log("f",com['id']+".py class raised an unknown exception! Check for syntax errors.")
+            self.log("f",str(type(e)))
             sys.exit(0)
 
         if _devs[com['id']].test() == com['id']:
-            log("i","Loading command library and sub-routines for "+com['id']+".")
+            self.log("i","Loading command library and sub-routines for "+com['id']+".")
         else:
-            log("e","This class do not match "+com['id']+" device!")
+            self.log("e","This class do not match "+com['id']+" device!")
             sys.exit(0)
 
         self.devs[com['id']] = _devs[com['id']]                      #Enable access to device routines
@@ -72,27 +76,28 @@ class Device:
             real_id = "".join([c for c in real_id.split("\n") if c != ""])
         if real_id is not "":
             if real_id == "REFUSED":
-                log("e","Socket connection refused for DEV="+com['id']+".")
-                log("e","Server is switched OFF.")
+                self.log("e","Socket connection refused for DEV="+com['id']+".")
+                self.log("e","Server is switched OFF.")
                 sys.exit(0)
             if com['model'] not in real_id and com['model'][1:] not in real_id: 
                 if self.args.selectPort:
-                    log("w","Outdated or not matching class for DEV="+com['id']+" was provided.")
-                    log("w","MODEL found    = "+str(real_id)) 
-                    log("w","MODEL required = "+com['model'])
-                    log("e","Please use --selectPort again to select ports manually in case your class is not outdated.")
+                    self.log("w","Outdated or not matching class for DEV="+com['id']+" was provided.")
+                    self.log("w","MODEL found    = "+str(real_id)) 
+                    self.log("w","MODEL required = "+com['model'])
+                    self.log("e","Please use --selectPort again to select ports manually in case your class is not outdated.")
                     sys.exit(0)
                 else:
-                    log("w","Device ID="+com['id']+" not matched. Retry...")
+                    print(real_id) 
+                    self.log("w","Device ID="+com['id']+" not matched. Retry...")
                     real_id = "FAILED"
             else:
-                log("i","Response received from DEV_NAME="+str(real_id))
+                self.log("i","Response received from DEV_NAME="+str(real_id))
         else:
             if self.args.selectPort:
-                log("w","Please turn on device ID="+com['id']+".")
+                self.log("w","Please turn on device ID="+com['id']+".")
                 sys.exit(0)
             else:
-                log("w","Device ID="+com['id']+" not matched. Retry...")
+                self.log("w","Device ID="+com['id']+" not matched. Retry...")
                 real_id = "FAILED"
 
         return real_id,com
@@ -107,7 +112,7 @@ class Device:
         if cmd['cmd'] == "" or cmd['cmd'] == "UNKNOWN":
             return False
         if self.args.verbosity > 2:
-            log("i",cmd['id']+" : WRITECMD : \""+str(cmd['cmd'])+"\".")
+            self.log("i",cmd['id']+" : WRITECMD : \""+str(cmd['cmd'])+"\".")
 
         write_status = self.devs[cmd['id']].write(cmd['com'],cmd['cmd'])
         return write_status
@@ -122,7 +127,7 @@ class Device:
         if cmd['cmd'] == "" or cmd['cmd'] == "UNKNOWN":
             return False   
         if self.args.verbosity > 2:
-            log("i",cmd['id']+" : READCMD : \""+str(cmd['cmd'])+"\".")
+            self.log("i",cmd['id']+" : READCMD : \""+str(cmd['cmd'])+"\".")
 
         read_value = self.devs[cmd['id']].read(cmd['com'],cmd['cmd'])
         return read_value
@@ -152,7 +157,7 @@ class Device:
         #Vital commands must be defined in corresponding class
         (raw_cmd,isOK,isNOT) = self.devs[com['id']].cmd(_cmd_type, arg = arg, cat = cat)
         if (vital and len(raw_cmd)==0) or (vital and raw_cmd=="UNKNOWN"):
-            log("e","Command: "+_cmd_type+" not defined in "+com['id']+" class.")
+            self.log("e","Command: "+_cmd_type+" not defined in "+com['id']+" class.")
             self.__terminate__("EXIT") #TODO: crosscheck for abort commands in device class must be done when importing
         if len(check) != 0:
             isBit = False
@@ -189,7 +194,7 @@ class Device:
         #Vital parameters must be defined in corresponding class
         raw_par = self.devs[com['id']].par(par_type)
         if (vital and len(str(raw_par))==0) or (vital and str(raw_par)=="UNKNOWN"):
-            log("e","Parameter: "+str(par_type)+" not defined in "+com['id']+" class.")
+            self.log("e","Parameter: "+str(par_type)+" not defined in "+com['id']+" class.")
             self.__terminate__("EXIT")
 
         return raw_par
@@ -223,17 +228,17 @@ class Device:
 
                 if len(self.interlock[dev_type])!=0:
                     if isOK:
-                        log("i","Interlock exists for "+dev_info+".")
+                        self.log("i","Interlock exists for "+dev_info+".")
                     else:
-                        log("h","Interlock cable for "+dev_info+" was found but it is not connected or fixture is open!!!")
+                        self.log("h","Interlock cable for "+dev_info+" was found but it is not connected or fixture is open!!!")
                         if safeMode: 
                             self.__terminate__("EXIT")
                 else:
-                    log("h","Interlock for "+dev_info+" does not exist!!!")
+                    self.log("h","Interlock for "+dev_info+" does not exist!!!")
                     if safeMode: 
                         self.__terminate__("EXIT")
             else:
-                log("i","Interlock for "+dev_info+" is not defined or implicitely checked.")
+                self.log("i","Interlock for "+dev_info+" is not defined or implicitely checked.")
 
     def __checkBias__(self,com,bias):
         #######################################################
@@ -242,20 +247,20 @@ class Device:
         #######################################################
 
         if float(bias) > self.maxBias:
-            log("w","Selected bias overflow! Setting maximum bias: "+str(self.maxBias)+"V.")
+            self.log("w","Selected bias overflow! Setting maximum bias: "+str(self.maxBias)+"V.")
             return str(self.maxBias)
         elif float(bias) < self.minBias:
-            log("w","Selected bias underflow! Setting minimum bias: "+str(self.minBias)+"V.")
+            self.log("w","Selected bias underflow! Setting minimum bias: "+str(self.minBias)+"V.")
             return str(self.minBias)
         else:
             if self.__par__(com,"decimalVolt",vital=True):
                 if len(str(bias).split(".")[-1]) > 2:
-                    log("i","Maximum 2 decimal places are allowed. Pre-Setting bias to: "+"{:.2f}".format(bias)+"V.")
+                    self.log("i","Maximum 2 decimal places are allowed. Pre-Setting bias to: "+"{:.2f}".format(bias)+"V.")
                 else:
-                    log("i","Pre-Setting bias to: "+"{:.2f}".format(bias)+"V.")
+                    self.log("i","Pre-Setting bias to: "+"{:.2f}".format(bias)+"V.")
                 return "{:.2f}".format(bias)
             else:
-                log("i","Decimals not allowed. Pre-Setting bias to: "+str(int(bias))+"V.")
+                self.log("i","Decimals not allowed. Pre-Setting bias to: "+str(int(bias))+"V.")
                 return str(int(bias))
 
     def __checkBiasRange__(self,com,biasRange):
@@ -375,14 +380,14 @@ class Device:
         realVelo = self.__read__(self.__cmd__(self.coms[dev_type],"VELOCITY?"))
         if not motionIsDone:
             if self.args.verbosity > 2:
-                log("i","Real velocity for "+str(dev_type_info).capitalize()+" is "+str(realVelo)+".")
+                self.log("i","Real velocity for "+str(dev_type_info).capitalize()+" is "+str(realVelo)+".")
             if realVelo and abs(float(realVelo)) > 0.:
-                log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info).capitalize())
+                self.log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info).capitalize())
                 self.__abort__(dev_type)
                 self.__terminate__("EXIT")
             else:
                 if self.args.verbosity > 1:
-                    log("i","All movement stopped for "+str(dev_type_info).capitalize()+".")
+                    self.log("i","All movement stopped for "+str(dev_type_info).capitalize()+".")
         else:
             return False
 
@@ -391,7 +396,7 @@ class Device:
         #Run sequence of commands initializing device
         #############################################
 
-        log("i","Initializing starting sequence.")
+        self.log("i","Initializing starting sequence.")
 
         #Minimum initialization in case of emergency
         if EMG:
@@ -405,10 +410,10 @@ class Device:
             return False    
 
         #Bias boundaries for the source device
-        if self.args.extVSource:
+        if self.args.extVSource and not self.args.isEnviroOnly:
             self.minBias = self.__par__(coms['source'],"minBias")
             self.maxBias = self.__par__(coms['source'],"maxBias")
-        else:
+        elif not self.args.isEnviroOnly:
             self.minBias = self.__par__(coms['meas'],"minBias")
             self.maxBias = self.__par__(coms['meas'],"maxBias")    
 
@@ -454,18 +459,18 @@ class Device:
                 self.__write__(self.__cmd__(coms[dev_type],"SVELOCITY",arg=self.__par__(coms[dev_type],"safeVelo")))
                 if self.args.verbosity > 0:
                     setVelo = self.__read__(self.__cmd__(coms[dev_type],"SETVELO?"))
-                    log("i",dev_type_info.capitalize()+" control velocity set to "+str(setVelo))
+                    self.log("i",dev_type_info.capitalize()+" control velocity set to "+str(setVelo))
 
                 #turn ON motor    
                 self.__write__(self.__cmd__(coms[dev_type],"MOTOR",arg="ON",vital=True))
                 time.sleep(self.sleep_time[dev_type]['medium'])
                 isMotorOn = bool(int(self.__read__(self.__cmd__(coms[dev_type],"MOTOR?",vital=True))))
                 if not isMotorOn:
-                    log("e",str(dev_type_info).capitalize()+" motor is turned OFF while expected working!")
+                    self.log("e",str(dev_type_info).capitalize()+" motor is turned OFF while expected working!")
                     self.__terminate__("EXIT")
                 else:
                     if self.args.verbosity > 0:
-                        log("i",str(dev_type_info).capitalize()+" motor is ON.")    
+                        self.log("i",str(dev_type_info).capitalize()+" motor is ON.")    
                 
                 #goto home position
                 self.__write__(self.__cmd__(coms[dev_type],"GOHOME",vital=True))
@@ -495,8 +500,8 @@ class Device:
                     self.__detectMalfunction__(motionIsDone,dev_type)
 
         #notify user to position probe manually           
-        if self.stations == 0:
-            log("w","No station device is used. User is expected to ensure bias ring connection manually.")
+        if self.stations == 0 and not self.args.isEnviroOnly:
+            self.log("w","No station device is used. User is expected to ensure bias ring connection manually.")
 
     def __prepMeasurement__(self):
         ################################################################
@@ -514,7 +519,7 @@ class Device:
         else:
             powerOnSetup = self.__read__(self.__cmd__(self.coms['meas'],"POSETUP?"))
         if not powerOnSetup or len(powerOnSetup) == 0: powerOnSetup = "UNKNOWN"    
-        log("i","PowerOn setup: "+str(powerOnSetup))    
+        self.log("i","PowerOn setup: "+str(powerOnSetup))    
 
         #Clear buffer of measurement device and set buffer memory size
         self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True)) 
@@ -526,7 +531,7 @@ class Device:
         #Run device specific pre-routine if specified by device-specific class (for all)
         for dev_type in self.coms:
             status, message = self.devs[self.coms[dev_type]['id']].pre(self.coms[dev_type]['com'])
-            log(status, message)
+            self.log(status, message)
             if status in ["e","f"]:
                 self.__terminate__("EXIT")
 
@@ -539,8 +544,8 @@ class Device:
                 limVSet = self.__read__(self.__cmd__(self.coms['source'],"VOLTLIM?"))
                 limVDef = self.__par__(self.coms['source'],"defBias")
                 if limVSet:
-                    log("i","External Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")    
-                    log("i","External Source Voltage limit was set (user) to "+str(limVSet)+".")
+                    self.log("i","External Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")    
+                    self.log("i","External Source Voltage limit was set (user) to "+str(limVSet)+".")
         else:
             self.__write__(self.__cmd__(self.coms['meas'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
             if self.__par__(self.coms['meas'],"vlimitCheckable",vital=True):
@@ -549,8 +554,8 @@ class Device:
                 limVSet = self.__read__(self.__cmd__(self.coms['meas'],"VOLTLIM?"))
                 limVDef = self.__par__(self.coms['meas'],"defBias")
                 if limVSet:
-                    log("i","Measurement device Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")
-                    log("i","Measurement device Source Voltage limit was set (user) to "+str(limVSet)+".")
+                    self.log("i","Measurement device Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")
+                    self.log("i","Measurement device Source Voltage limit was set (user) to "+str(limVSet)+".")
 
         #re-enable safe connection by controling z-station only
         if 'zstation' in self.coms:
@@ -567,7 +572,7 @@ class Device:
                 runTime += self.sleep_time['zstation']['long']
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:     
-            log("w","If not done manually, probe is not touching sensor.")
+            self.log("w","If not done manually, probe is not touching sensor.")
 
     def __abort__(self,dev_type="ALL"):
         ####################################################################
@@ -582,9 +587,9 @@ class Device:
         #         (WARNING: not safe if called without thinking!) 
         ####################################################################
         if dev_type != "EXIT":
-            log("i","Abort requested for "+dev_type+".")
+            self.log("i","Abort requested for "+dev_type+".")
         else:
-            log("i","Abort requested for ALL followed by EXIT.")
+            self.log("i","Abort requested for ALL followed by EXIT.")
 
         if dev_type == "ALL":
             first_dev = ""
@@ -641,9 +646,9 @@ class Device:
         #         (WARNING: not safe if called without thinking!) 
         ####################################################################
         if dev_type != "EXIT":
-            log("i","Terminate requested for "+dev_type+".")
+            self.log("i","Terminate requested for "+dev_type+".")
         else:
-            log("i","Terminate requested for ALL followed by EXIT.")
+            self.log("i","Terminate requested for ALL followed by EXIT.")
 
         if dev_type == "ALL": 
             for _dev_type in self.coms.keys():
@@ -658,7 +663,7 @@ class Device:
                 dev_type_info = "z-station"
             else:
                 dev_type_info = dev_type
-            log("i","Finalizing measurement.")
+            self.log("i","Finalizing measurement.")
 
             #FIRST SEQUENCE
             _vital = False
@@ -668,11 +673,11 @@ class Device:
                 self.__write__(self.__cmd__(self.coms[dev_type],"SVOLT",arg="0",vital=_vital))
                 source_stat = self.__read__(self.__cmd__(self.coms[dev_type],"SOURCE?",vital=_vital))
                 if not self.__cmd__(self.coms[dev_type],"SOURCE?",vital=_vital,check=source_stat):
-                    log("i","Turning OFF high-voltage source for "+dev_type_info+".")
+                    self.log("i","Turning OFF high-voltage source for "+dev_type_info+".")
                     self.__write__(self.__cmd__(self.coms[dev_type],"SOURCE",arg="OFF",vital=_vital))
                 setVolt = self.__read__(self.__cmd__(self.coms[dev_type],"VOLT?",vital=_vital))
                 if self.args.verbosity > 1:
-                    log("i","Voltage re-set to zero for "+dev_type_info+": "+str(setVolt))    
+                    self.log("i","Voltage re-set to zero for "+dev_type_info+": "+str(setVolt))    
             elif "station" in dev_type and dev_type in self.sleep_time.keys():    
                 #stop motor movement if needed
                 self.__write__(self.__cmd__(self.coms[dev_type],"STOP",vital=True))
@@ -686,17 +691,17 @@ class Device:
                         motionIsDone = bool(int(returnValue))
                     runTime += self.sleep_time[dev_type]['long']
                 if not motionIsDone:
-                    log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info))
+                    self.log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info))
                     self.__abort__(dev_type)
                 else:
                     #cross check for real velocity
                     realVelo = self.__read__(self.__cmd__(self.coms[dev_type],"VELOCITY?",vital=True))
                     if realVelo and float(realVelo) > 0.:
-                        log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info))
+                        self.log("h","EMERGENCY ABORT LAUNCHED for "+str(dev_type_info))
                         self.__abort__(dev_type)
                     else:
                         if self.args.verbosity > 1:
-                            log("i","All movement stopped for "+str(dev_type_info)+".")
+                            self.log("i","All movement stopped for "+str(dev_type_info)+".")
          
             #SECOND SEQUENCE        
             self.__write__(self.__cmd__(self.coms[dev_type],"ZCHECK",arg="ON"))
@@ -707,17 +712,40 @@ class Device:
                 time.sleep(self.sleep_time[dev_type]['medium'])
                 isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms[dev_type],"MOTOR?",vital=True))))
                 if isMotorOn:
-                    log("h",str(dev_type_info).capitalize()+" motor is turned ON while expected OFF!")
+                    self.log("h",str(dev_type_info).capitalize()+" motor is turned ON while expected OFF!")
                     self.__abort__(dev_type)
                 else:
                     if self.args.verbosity > 1:
-                        log("i","Motor for "+str(dev_type_info)+" was turned OFF.")
+                        self.log("i","Motor for "+str(dev_type_info)+" was turned OFF.")
             #set local
             self.__setLocal__(dev_type)
 
         elif dev_type == "EXIT":
             self.__terminate__("ALL")
             sys.exit(0)
+
+    def load_socket(self,SOCKETS,EMG):
+        ########################################################
+        #Global function called from mkMeasure to get response
+        #from all socket devices only.
+        ########################################################
+        try:
+            for dev_type in self.args.addSocket:
+                DEV_PROBE_NAME,self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])  
+        except KeyboardInterrupt:
+            self.log("w","Keyboard interruption during socket selection detected.")
+            sys.exit(0)
+
+        #Initialize sequence
+        try:
+            self.__initDevice__(self.coms,EMG)
+        except KeyboardInterrupt:
+            self.log("w","Keyboard interruption during device initialization detected.")
+            with warden.DelayedKeyboardInterrupt(force=False, logfile=self.args.logname):
+                self.__terminate__("EXIT")
+            
+        #Return success if all is OK
+        return { 'success' : 1 } 
 
     def load(self,COMS,SOCKETS,EMG):
         ########################################################
@@ -734,8 +762,9 @@ class Device:
             OTHER_DEV_NAMES = {}
             for dev_type in self.args.addPort:
                 OTHER_DEV_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(COMS[dev_type])
+            OTHER_SOCKET_NAMES = {}
             for dev_type in self.args.addSocket:    
-                DEV_PROBE_NAME,self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])
+                OTHER_SOCKET_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])
       
             loadStatus = {}
             if "FAILED" in DEV_MEAS_NAME:
@@ -751,14 +780,20 @@ class Device:
                     loadStatus[dev_type] = (self.coms[dev_type]['port'],0)
                 else:
                     loadStatus[dev_type] = (self.coms[dev_type]['port'],1)
+            for dev_type in self.args.addSocket:
+                if "FAILED" in OTHER_SOCKET_NAMES[dev_type]:
+                    loadStatus[dev_type] = (self.coms[dev_type]['com']['port'],2) #Failed socket connection
+                else:
+                    loadStatus[dev_type] = (self.coms[dev_type]['com']['port'],3) #Good socket connection
+
             allOK = True        
             for key in loadStatus.keys():
                 port,valid = loadStatus[key]
-                if valid == 0:
+                if valid == 0 or valid == 2:
                     allOK = False 
             if not allOK: return loadStatus
         except KeyboardInterrupt:
-            log("w","Keyboard interruption during port selection detected.")
+            self.log("w","Keyboard interruption during port selection detected.")
             sys.exit(0)
 
         #-----------------------------------------------------------------------------------------------
@@ -774,8 +809,8 @@ class Device:
         try:
             self.__initDevice__(self.coms,EMG)
         except KeyboardInterrupt:
-            log("w","Keyboard interruption during device initialization detected.")
-            with warden.DelayedKeyboardInterrupt(force=False): 
+            self.log("w","Keyboard interruption during device initialization detected.")
+            with warden.DelayedKeyboardInterrupt(force=False, logfile=self.args.logname): 
                 self.__terminate__("EXIT")
 
         #Return success if all is OK
@@ -800,32 +835,32 @@ class Device:
         _function = str(self.__par__(self.coms['meas'],"fCurr"))
         self.__write__(self.__cmd__(self.coms['meas'],"SENSEF", arg=_function,vital=True))
         if self.args.verbosity > 0:
-            log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
+            self.log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
 
         #Adjusting current range for measurement device
         self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
         isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
         if not isAuto:
-            log("i","IV measurement: Current AUTO range disabled.")
+            self.log("i","IV measurement: Current AUTO range disabled.")
             self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(0.))))
             if self.args.verbosity > 0:
                 setCurrRange = self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?"))
                 if setCurrRange:
-                    log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
+                    self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
         else:
-            log("i","IV measurement: Current AUTO range enabled.")
+            self.log("i","IV measurement: Current AUTO range enabled.")
 
         #Turning OFF Zero Check if possible and Turning ON Zero Correct if possible
         _zcheck = self.__read__(self.__cmd__(self.coms['meas'],"ZCHECK?"))
         if _zcheck:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCHECK",arg="OFF"))
             if self.args.verbosity > 0:
-                log("i","Turning OFF Zero Check.")
+                self.log("i","Turning OFF Zero Check.")
         _zcor = self.__read__(self.__cmd__(self.coms['meas'],"ZCOR?"))
         if not _zcor:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCOR",arg="ON"))
             if self.args.verbosity > 0:
-                log("i","Turning ON Zero Correct.")
+                self.log("i","Turning ON Zero Correct.")
         time.sleep(self.sleep_time['meas']['medium'])
 
         #Setup buffer memory size if possible
@@ -837,23 +872,23 @@ class Device:
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
-            log("e","Trigger is not supported by this measurement device (or commands are not specified).")
+            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
        
         if connectTimeError == 0:
             #Wait until user confirms connection
-            log("i","##################################################")
-            log("i","#Please establish connection with measured sensor.")
-            log("i","#To cancel manual sensing mode press \"n\".")
-            log("i","##################################################")
+            self.log("i","##################################################")
+            self.log("i","#Please establish connection with measured sensor.")
+            self.log("i","#To cancel manual sensing mode press \"n\".")
+            self.log("i","##################################################")
 
             userInput = ""
             isConnected = False
             while not isConnected:
-                userInput = log("tt","Press \"y\" to test connection: ")
+                userInput = self.log("tt","Press \"y\" to test connection: ")
                 try:
                     userInput.lower()
                 except AttributeError:
-                    log("w","Common! I said press \"n\" to cancel...")
+                    self.log("w","Common! I said press \"n\" to cancel...")
                     userInput = ""
                 if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["y","f"]:
                     if fullManual or userInput.lower().split(" ")[0] == "f":
@@ -874,7 +909,7 @@ class Device:
 
                         #Process read out
                         if len(readout) == 0:
-                            log("w","Readout is empty!")
+                            self.log("w","Readout is empty!")
                             continue
 
                         current_readings = []
@@ -884,14 +919,14 @@ class Device:
                                 curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
                                 current_readings.append(curr)
                                 if self.args.verbosity > 0:
-                                    log("i","Current reading: "+str(curr))
+                                    self.log("i","Current reading: "+str(curr))
 
                         current = 0.0
                         if len(current_readings) == nSamples:
                             current = sum(current_readings)/float(nSamples)
                         else:
                             if len(current_readings) == 0:
-                                log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
+                                self.log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
                                 continue
                             else:
                                 current = sum(current_readings)/float(len(current_readings))
@@ -900,15 +935,15 @@ class Device:
                         if abs(current) > residualCurrent:
                             isConnected = True
                 elif len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] == "n":
-                    log("w","Bias ring connection not established. Measurement interrupted by user.")
+                    self.log("w","Bias ring connection not established. Measurement interrupted by user.")
                     self.__terminate__()
                     return False
 
         else:
             #Loop until runTimeError or connection established
-            log("i","#################################################")
-            log("i","Please establish connection with measured sensor.")
-            log("i","#################################################")
+            self.log("i","#################################################")
+            self.log("i","Please establish connection with measured sensor.")
+            self.log("i","#################################################")
             isConnected = False
             stableCurrent = []
             runTime = 0.
@@ -929,7 +964,7 @@ class Device:
 
                 #Process read out
                 if len(readout) == 0:
-                    log("w","Readout is empty!")
+                    self.log("w","Readout is empty!")
                     continue
 
                 current_readings = []
@@ -939,14 +974,14 @@ class Device:
                         curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
                         current_readings.append(curr)
                         if self.args.verbosity > 0:
-                            log("i","Current reading: "+str(curr))
+                            self.log("i","Current reading: "+str(curr))
 
                 current = 0.0
                 if len(current_readings) == nSamples:
                     current = sum(current_readings)/float(nSamples)
                 else:
                     if len(current_readings) == 0:
-                        log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
+                        self.log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
                         continue
                     else:
                         current = sum(current_readings)/float(len(current_readings))
@@ -966,11 +1001,11 @@ class Device:
 
         #In case of connection, move table to ready to connect relative position before closing box
         if not isConnected:
-            log("w","Failed to establish bias connection. Repeat sensing.")
+            self.log("w","Failed to establish bias connection. Repeat sensing.")
             self.__terminate__()
             return False
         else:
-            log("i","Bias connection established.")
+            self.log("i","Bias connection established.")
         time.sleep(self.sleep_time['meas']['long'])
         if 'zstation' in self.coms:
             if not self.__write__(self.__cmd__(self.coms['zstation'],"SGOTOREL",arg=self.__par__(self.coms['zstation'],"detouchPosition"),vital=False)):
@@ -986,7 +1021,7 @@ class Device:
                 runTime += self.sleep_time['zstation']['long']
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
-            log("w","If not removed manually, probe is now touching sensor.")
+            self.log("w","If not removed manually, probe is now touching sensor.")
 
         return True   
 
@@ -996,13 +1031,13 @@ class Device:
         ###################################################################
         
         if mode == "DEBUG": #ignore
-            log("h","Ignoring initial environmental conditions and TestBox check.")
+            self.log("h","Ignoring initial environmental conditions and TestBox check.")
             return True
          
-        log("i","#################################################")
-        log("i","Please close the TestBox.")
-        log("i","Press \"n\" for terminate.")
-        log("i","#################################################")
+        self.log("i","#################################################")
+        self.log("i","Please close the TestBox.")
+        self.log("i","Press \"n\" for terminate.")
+        self.log("i","#################################################")
         if not self.args.extVSource:
             source_dev = 'meas'
         else:
@@ -1011,7 +1046,7 @@ class Device:
         isClosed = False
         isReady  = False
         while not isClosed or not isReady:
-            userInput = log("tt","Press \"y\" to test environmental conditions.")
+            userInput = self.log("tt","Press \"y\" to test environmental conditions.")
             if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["y","f"]:
                 if userInput.lower().split(" ")[0] == "f":
                     isClosed = True
@@ -1019,7 +1054,7 @@ class Device:
                 else: 
                     #check environmental conditions
                     if 'probe' not in self.args.addSocket:
-                        log("e","Device providing environmental measurements is required.")
+                        self.log("e","Device providing environmental measurements is required.")
                         self.__terminate__()
                         return False
                     initTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
@@ -1030,22 +1065,22 @@ class Device:
                     reqLumi = self.__par__(self.coms['probe'],"reqLumi")
                     isReady = True
                     if float(initTemp0) < float(reqTemp['min']) or float(initTemp0) > float(reqTemp['max']):
-                        log("w","Measured temperature is: "+str(initTemp0)+".")
+                        self.log("w","Measured temperature is: "+str(initTemp0)+".")
                         isReady = False
                     if float(initHumi) < float(reqHumi['min']) or float(initHumi) > float(reqHumi['max']):
-                        log("w","Measured humidity is: "+str(initHumi)+".")
+                        self.log("w","Measured humidity is: "+str(initHumi)+".")
                         isReady = False
                     if float(initLumi) < float(reqLumi['min']) or float(initLumi) > float(reqLumi['max']):
-                        log("w","Measured luminescence is: "+str(initLumi)+".")
+                        self.log("w","Measured luminescence is: "+str(initLumi)+".")
                         isReady = False  
                     
                     #check if box and dry air ventil are closed
                     if not isReady:
-                        log("w","Wrong environmental conditions!")
+                        self.log("w","Wrong environmental conditions!")
                     else:
-                        log("i","Good environmental conditions confirmed.")
-                        log("i","Please check if box and dry air ventil are closed.")
-                        userSecondaryInput = log("tt","Press \"y\" to continue measurement: ")
+                        self.log("i","Good environmental conditions confirmed.")
+                        self.log("i","Please check if box and dry air ventil are closed.")
+                        userSecondaryInput = self.log("tt","Press \"y\" to continue measurement: ")
                         if len(userSecondaryInput.lower().split(" ")) >=1 and userSecondaryInput.lower().split(" ")[0] == "y":
                             if self.__par__(self.coms[source_dev],"inhibitorCheckable",vital=True):
                                 inh_status = self.__read__(self.__cmd__(self.coms[source_dev],"INHIBITOR?",vital=False))
@@ -1054,18 +1089,81 @@ class Device:
                                 else:
                                     isClosed = False
                         elif len(userSecondaryInput.lower().split(" ")) >=1 and userSecondaryInput.lower().split(" ")[0] == "n":
-                            log("w","Box is not closed. Measurement interrupted by user.")
+                            self.log("w","Box is not closed. Measurement interrupted by user.")
                             self.__terminate__()
                             return False
                         if not isClosed:
-                            log("w","Active inhibitor detected! Box is not closed.")
+                            self.log("w","Active inhibitor detected! Box is not closed.")
             elif len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] == "n":
-                log("w","Environmental conditions not checked. Measurement interrupted by user.")
+                self.log("w","Environmental conditions not checked. Measurement interrupted by user.")
                 self.__terminate__()
                 return False
 
-        log("i","Initial environmental conditions, HV inhibitor and TestBox checked.")    
+        self.log("i","Initial environmental conditions, HV inhibitor and TestBox checked.")    
         return True
+
+    def singleENV(self, mtype="all", isLast=True, isFirst=False):
+        ################################
+        #Single enviro measurement
+        ################################
+
+        #initialize pre-requisities if needed 
+        dev_type = 'probe'
+        if isFirst and (dev_type in self.args.addSocket or dev_type in self.args.addPort):
+            status, message = self.devs[self.coms[dev_type]['id']].pre(self.coms[dev_type]['com'])
+            self.log(status, message)
+            if status in ["e","f"]:
+                self.__terminate__("EXIT") 
+
+        #Read out enviro data
+        enviro = {}
+        preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
+        if dev_type in self.args.addSocket or dev_type in self.args.addPort:
+            if mtype == "all":
+                preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+            elif mtype == "temp":
+                preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+            elif mtype == "humi":
+                preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+            elif mtype == "lumi":
+                preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+        enviro['temp1'] = preTemp0
+        enviro['temp2'] = preTemp1
+        enviro['temp3'] = preTemp2
+        enviro['humi'] = preHumi
+        enviro['lumi'] = preLumi
+        if mtype == "all":
+            self.log("i","Temperature CH0:   "+str(preTemp0))
+            self.log("i","Temperature CH1:   "+str(preTemp1))
+            self.log("i","Temperature CH2:   "+str(preTemp2))
+            self.log("i","Relative humidity: "+str(preHumi)+"%")
+            self.log("i","Lux:               "+str(preLumi))  
+        elif  mtype == "temp":
+            self.log("i","Temperature CH0:   "+str(preTemp0))
+            self.log("i","Temperature CH1:   "+str(preTemp1))
+            self.log("i","Temperature CH2:   "+str(preTemp2))
+        elif mtype == "humi":
+            self.log("i","Relative humidity: "+str(preHumi)+"%")
+        elif mtype == "lumi":
+            self.log("i","Lux:               "+str(preLumi))  
+
+        #Finalize measurement
+        if isLast:
+            try:
+                self.__terminate__()
+            except OSError:
+                self.log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                self.log("h","Manual abort required.")
+
+        #Return readings
+        return enviro 
 
     def single(self, mtype="IV", mpoint=0, sampleTime=0.50, nSamples=5, isLast=True, isFirst=False):
         #######################################
@@ -1075,7 +1173,7 @@ class Device:
         if "IV" in mtype:
             return self.singleIV(biasPoint=mpoint, sampleTime=sampleTime, nSamples=nSamples, isLast=isLast, isFirst=isFirst)
         else:
-            log("f","Unknown single measurement type.")
+            self.log("f","Unknown single measurement type.")
             sys.exit(0)
         
     def singleIV(self, biasPoint=0, sampleTime=0.50, nSamples=5, isLast=True, isFirst=False):
@@ -1104,10 +1202,10 @@ class Device:
 
         #Check settings
         if sampleTime < float(self.__par__(self.coms['meas'],"minSampleTime")):
-            log("w","Minimum sample time per IV measurement exceeded. Setting sample time to minimum.")
+            self.log("w","Minimum sample time per IV measurement exceeded. Setting sample time to minimum.")
             sampleTime = float(self.__par__(self.coms['meas'],"minSampleTime"))
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
-            log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
+            self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)  
 
@@ -1135,38 +1233,38 @@ class Device:
         if self.args.verbosity > 0:
             setBias = self.__read__(self.__cmd__(self.coms[source_dev],"VOLT?"))
             if setBias:
-                log("i","Voltage set: "+str(setBias)+".")
+                self.log("i","Voltage set: "+str(setBias)+".")
 
         #Define measurement type to IV
         _function = str(self.__par__(self.coms['meas'],"fCurr")) 
         self.__write__(self.__cmd__(self.coms['meas'],"SENSEF", arg=_function,vital=True))
         if self.args.verbosity > 0:
-            log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
+            self.log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
 
         #Adjusting current range for measurement device
         self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
         isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
         if not isAuto:
-            log("i","IV measurement: Current AUTO range disabled.")
+            self.log("i","IV measurement: Current AUTO range disabled.")
             self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(float(biasPoint)))))
             if self.args.verbosity > 0:
                 setCurrRange = self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?"))
                 if setCurrRange:
-                    log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
+                    self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
         else:
-            log("i","IV measurement: Current AUTO range enabled.")
+            self.log("i","IV measurement: Current AUTO range enabled.")
 
         #Turning OFF Zero Check if possible and Turning ON Zero Correct if possible
         _zcheck = self.__read__(self.__cmd__(self.coms['meas'],"ZCHECK?"))
         if _zcheck:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCHECK",arg="OFF"))
             if self.args.verbosity > 0:
-                log("i","Turning OFF Zero Check.")
+                self.log("i","Turning OFF Zero Check.")
         _zcor = self.__read__(self.__cmd__(self.coms['meas'],"ZCOR?")) 
         if not _zcor:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCOR",arg="ON"))
             if self.args.verbosity > 0:
-                log("i","Turning ON Zero Correct.")
+                self.log("i","Turning ON Zero Correct.")
         time.sleep(self.sleep_time['meas']['medium'])        
 
         #Setup buffer memory size if possible
@@ -1178,16 +1276,16 @@ class Device:
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
-            log("e","Trigger is not supported by this measurement device (or commands are not specified).")
+            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
 
         #Turn on bias!!!
-        log("i","Turning ON high-voltage source for "+source_dev_info+".")
+        self.log("i","Turning ON high-voltage source for "+source_dev_info+".")
         self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="ON",vital=True))
 
         #Accomodating for charging time
-        log("i","Charging time...")
+        self.log("i","Charging time...")
         time.sleep(self.__chargingTime__(0.,float(biasPoint)))
-        log("i","Released.") 
+        self.log("i","Released.") 
 
         #Read out enviro data
         enviro = {}
@@ -1203,11 +1301,11 @@ class Device:
         enviro['temp3'] = preTemp2
         enviro['humi'] = preHumi
         enviro['lumi'] = preLumi
-        log("i","Temperature CH0 before measurement: "+str(preTemp0))
-        log("i","Temperature CH1 before measurement: "+str(preTemp1))
-        log("i","Temperature CH2 before measurement: "+str(preTemp2))
-        log("i","Humidity before measurement: "+str(preHumi))
-        log("i","Lumi before measurement: "+str(preLumi))
+        self.log("i","Temperature CH0 before measurement: "+str(preTemp0))
+        self.log("i","Temperature CH1 before measurement: "+str(preTemp1))
+        self.log("i","Temperature CH2 before measurement: "+str(preTemp2))
+        self.log("i","Humidity before measurement: "+str(preHumi))
+        self.log("i","Lumi before measurement: "+str(preLumi))
 
         #Read out measurement data
         readout = ""
@@ -1222,7 +1320,7 @@ class Device:
 
         #Return z-station to bottom position before finalizing measurement if it is last IV measurement
         if 'zstation' in self.coms and isLast:
-            log("i","Cleaning after last measurement")
+            self.log("i","Cleaning after last measurement")
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
             motionIsDone = False
             runTime = 0.
@@ -1236,17 +1334,17 @@ class Device:
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
             if not isLast:
-                log("w","Probe is still touching sensor! Another measurement continues.") 
+                self.log("w","Probe is still touching sensor! Another measurement continues.") 
             else: 
-                log("h","Probe is still touching sensor!")
+                self.log("h","Probe is still touching sensor!")
 
         #Process and return results
         if len(readout) == 0:
-            log("w","Readout is empty!")
+            self.log("w","Readout is empty!")
             self.__terminate__("EXIT")
         else:
             if self.args.verbosity > 1:
-                log("i",str(readout))
+                self.log("i",str(readout))
 
         current_readings = []
         readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim",vital=True))
@@ -1255,14 +1353,14 @@ class Device:
                 curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
                 current_readings.append(curr)
                 if self.args.verbosity > 0:
-                    log("i","Current reading: "+str(curr))
+                    self.log("i","Current reading: "+str(curr))
 
         current = 0.0
         if len(current_readings) == nSamples:
             current = sum(current_readings)/float(nSamples)
         else:
             if len(current_readings) == 0:
-                log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
+                self.log("e","Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
                 self.__terminate__("EXIT")
             else:    
                 current = sum(current_readings)/float(len(current_readings))
@@ -1274,8 +1372,8 @@ class Device:
             try: 
                 self.__terminate__()
             except OSError:
-                log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
-                log("h","Manual abort required.")
+                self.log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                self.log("h","Manual abort required.")
 
         #Return to mkMeasure
         return current, biasPoint, enviro
@@ -1288,7 +1386,7 @@ class Device:
         if "IV" in mtype:
             return self.continuousIV(biasRange=mrange, sampleTime=sampleTime, nSamples=nSamples, isLast=isLast, isFirst=isFirst)
         else:
-            log("f","Unknown continuous measurement type.")
+            self.log("f","Unknown continuous measurement type.")
             sys.exit(0)
 
     def continuousIV(self, biasRange, sampleTime, nSamples, isLast=True, isFirst=False):
@@ -1321,10 +1419,10 @@ class Device:
 
         #Check settings
         if sampleTime < float(self.__par__(self.coms['meas'],"minSampleTime")):
-            log("w","Minimum sample time per IV measurement underflow. Setting sample time to minimum.")
+            self.log("w","Minimum sample time per IV measurement underflow. Setting sample time to minimum.")
             sampleTime = float(self.__par__(self.coms['meas'],"minSampleTime"))
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
-            log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
+            self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
@@ -1352,19 +1450,19 @@ class Device:
         _function = str(self.__par__(self.coms['meas'],"fCurr"))
         self.__write__(self.__cmd__(self.coms['meas'],"SENSEF", arg=_function,vital=True))
         if self.args.verbosity > 0:
-            log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))   
+            self.log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))   
 
         #Turning OFF Zero Check if possible and Turning ON Zero Correct if possible
         _zcheck = self.__read__(self.__cmd__(self.coms['meas'],"ZCHECK?"))
         if _zcheck:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCHECK",arg="OFF"))
             if self.args.verbosity > 0:
-                log("i","Turning OFF Zero Check.")
+                self.log("i","Turning OFF Zero Check.")
         _zcor = self.__read__(self.__cmd__(self.coms['meas'],"ZCOR?"))
         if not _zcor:
             self.__write__(self.__cmd__(self.coms['meas'],"ZCOR",arg="ON"))
             if self.args.verbosity > 0:
-                log("i","Turning ON Zero Correct.")
+                self.log("i","Turning ON Zero Correct.")
         time.sleep(self.sleep_time['meas']['medium'])
 
         #Setup buffer memory size if possible
@@ -1376,10 +1474,10 @@ class Device:
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
             self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
-            log("e","Trigger is not supported by this measurement device (or commands are not specified).")    
+            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")    
 
         #Turn on bias!!!
-        log("i","Turning ON high-voltage source for "+source_dev_info+".")
+        self.log("i","Turning ON high-voltage source for "+source_dev_info+".")
         self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="ON",vital=True))    
 
         #Loop over bias values
@@ -1391,29 +1489,29 @@ class Device:
             if self.args.verbosity > 0:
                 setBias = self.__read__(self.__cmd__(self.coms[source_dev],"VOLT?"))
                 if setBias:
-                    log("i","Voltage set: "+str(setBias)+".")
+                    self.log("i","Voltage set: "+str(setBias)+".")
 
             if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) == 0:
                 #Accomodating for charging time
-                log("i","Charging time...")
+                self.log("i","Charging time...")
                 if ibias == 0:
                     time.sleep(self.__chargingTime__(0.,float(biasPoint)))
                 else:
                     time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
-                log("i","Released.")
+                self.log("i","Released.")
 
             #Adjusting current range for a measurement device
             self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
             isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
             if not isAuto:
-                log("i","IV measurement: Current AUTO range disabled.")
+                self.log("i","IV measurement: Current AUTO range disabled.")
                 self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(float(biasPoint)))))
                 if self.args.verbosity > 0:
                     setCurrRange = self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?"))
                     if setCurrRange:
-                        log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
+                        self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
             else:
-                log("i","IV measurement: Current AUTO range enabled.")  
+                self.log("i","IV measurement: Current AUTO range enabled.")  
 
             #Read out enviro data
             enviro = {}
@@ -1430,11 +1528,11 @@ class Device:
             enviro['humi']  = preHumi
             enviro['lumi']  = preLumi
             if self.args.verbosity > 1:
-                log("i","Temperature CH0 before measurement: "+str(preTemp0))
-                log("i","Temperature CH1 before measurement: "+str(preTemp1))
-                log("i","Temperature CH2 before measurement: "+str(preTemp2))
-                log("i","Humidity before measurement: "+str(preHumi))
-                log("i","Lumi before measurement: "+str(preLumi))    
+                self.log("i","Temperature CH0 before measurement: "+str(preTemp0))
+                self.log("i","Temperature CH1 before measurement: "+str(preTemp1))
+                self.log("i","Temperature CH2 before measurement: "+str(preTemp2))
+                self.log("i","Humidity before measurement: "+str(preHumi))
+                self.log("i","Lumi before measurement: "+str(preLumi))    
 
             #Read out measurement data
             readout = ""
@@ -1442,12 +1540,12 @@ class Device:
             self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False))                                 #Initialize trigger on source if needed
             if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) != 0:
                 #Accomodating for charging time
-                log("i","Charging time...")
+                self.log("i","Charging time...")
                 if ibias == 0:
                     time.sleep(self.__chargingTime__(0.,float(biasPoint)))
                 else:
                     time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
-                log("i","Released.")             
+                self.log("i","Released.")             
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
             time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
             self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
@@ -1457,11 +1555,11 @@ class Device:
         
             #Process and store results
             if len(readout) == 0:
-                log("w","Readout is empty!")
+                self.log("w","Readout is empty!")
                 self.__terminate__()
             else:
                 if self.args.verbosity > 1:
-                    log("i",str(readout))
+                    self.log("i",str(readout))
 
             current_readings = []
             readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim",vital=True))
@@ -1470,14 +1568,14 @@ class Device:
                     curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
                     current_readings.append(curr)
                     if self.args.verbosity > 0:
-                        log("i","Current reading: "+str(curr))
+                        self.log("i","Current reading: "+str(curr))
 
             current = 0.0
             if len(current_readings) == nSamples:
                 current = sum(current_readings)/float(nSamples)
             else:
                 if len(current_readings) == 0:
-                    log("w","BiasPoint: "+str(biasPoint)+": Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
+                    self.log("w","BiasPoint: "+str(biasPoint)+": Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
                     current = "N/A"
                     #self.__terminate__("EXIT")
                 else:
@@ -1493,7 +1591,7 @@ class Device:
 
         #Return z-station to bottom position before finalizing measurement
         if ('zstation' in self.coms and isLast) or ('zstation' in self.coms and currentOverflow):
-            log("i","Cleaning after last measurement") 
+            self.log("i","Cleaning after last measurement") 
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
             motionIsDone = False
             runTime = 0.
@@ -1507,17 +1605,17 @@ class Device:
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
             if not isLast:
-                log("w","Probe is still touching sensor! Another measurement continues.")
+                self.log("w","Probe is still touching sensor! Another measurement continues.")
             else: 
-                log("h","Probe is still touching sensor!")
+                self.log("h","Probe is still touching sensor!")
 
         #Finalize measurement
         if isLast or currentOverflow:
             try:
                 self.__terminate__()
             except OSError:
-                log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
-                log("h","Manual abort required.")
+                self.log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                self.log("h","Manual abort required.")
 
         #Return to mkMeasure
         return results
@@ -1547,10 +1645,10 @@ class Device:
 
         #Check settings
         if sampleTime < float(self.__par__(self.coms['meas'],"minSampleTime")):
-            log("w","Minimum sample time per IV measurement underflow. Setting sample time to minimum.")
+            self.log("w","Minimum sample time per IV measurement underflow. Setting sample time to minimum.")
             sampleTime = float(self.__par__(self.coms['meas'],"minSampleTime"))
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
-            log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
+            self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
@@ -1587,8 +1685,11 @@ class Device:
 
         for dev_type in self.coms.keys():
             if "probe" in dev_type:
-                self.__write__(self.__cmd__(self.coms[dev_type],"STOP",vital=True))
-        log("i","All done.")        
+                self.log("i","Probe server termination skipped.")
+                #self.__write__(self.__cmd__(self.coms[dev_type],"STOP",vital=True))
+                #HACK FIX ME
+                #os.system("runningMacros=`pgrep SensBoxEnvSer`; macrosArray=($(echo $runningMacros | tr ' ' \"\n\")); for macro in \"${macrosArray[@]}\"; do     kill $macro; done")
+        self.log("i","All done.")        
 
     #----------------------------------------
     #Quick global functions for parallel use:
@@ -1598,7 +1699,7 @@ class Device:
         ############################################################
         #Terminate all devices + return z-station to bottom position
         ############################################################
-        log("h","EMERGENCY TERMINATE SELECTED")
+        self.log("h","EMERGENCY TERMINATE SELECTED")
 
         #Return z-station to bottom position before finalizing measurement
         if 'zstation' in self.coms:
@@ -1614,7 +1715,7 @@ class Device:
                 runTime += self.sleep_time['zstation']['long']
             self.__detectMalfunction__(motionIsDone,"zstation")
         else:
-            log("h","Probe is still touching sensor!")
+            self.log("h","Probe is still touching sensor!")
 
         self.__terminate__("EXIT")
 
@@ -1622,7 +1723,7 @@ class Device:
         #############################################################
         #Abort all devices: TURN OFF HV and STOP MOVEMENT
         #############################################################
-        log("h","EMERGENCY ABORT SELECTED")
+        self.log("h","EMERGENCY ABORT SELECTED")
 
         #Emergency stop of moving parts
         if 'zstation' in self.coms:
