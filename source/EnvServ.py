@@ -67,7 +67,7 @@ pars = { 'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },              
          'remoteCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of voltage limits
          'reqTemp' : { 'par' : {'min' : 16., 'max' : 24.5}, 'vital' : True, 'alt' : ""},  #@Required temperature interval
-         'reqHumi' : { 'par' : {'min' : 0., 'max' : 40.0}, 'vital' : True, 'alt' : ""},   #@Required humidity interval
+         'reqHumi' : { 'par' : {'min' : 0., 'max' : 11.0}, 'vital' : True, 'alt' : ""},   #@Required humidity interval
          'reqLumi' : { 'par' : {'min' : 0., 'max' : 0.001}, 'vital' : True, 'alt' : ""},  #@Required lumi interval
 }
 
