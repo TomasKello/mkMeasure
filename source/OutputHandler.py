@@ -90,7 +90,7 @@ class OutputHandler:
         if "IV" in mtype:
             header = self._toLine("Bias [V]","Current [A]","TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI")
         if "ENV" in mtype:
-            header = self._toLine("TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI")
+            header = self._toLine("TIME [h-m-s]","TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI")
         lines.append(empty)
         lines.append(mtype)
         lines.append(header)
@@ -105,7 +105,8 @@ class OutputHandler:
                                          ))
         if "ENV" in mtype:
             for data in results['enviro']:
-                lines.append(self._toLine(data['temp1'],
+                lines.append(self._toLine(str(data['hour'])+"-"+str(data['minute'])+"-"+str(data['second']),
+                                          data['temp1'],
                                           data['temp2'],
                                           data['temp3'],
                                           data['humi'],
@@ -133,6 +134,9 @@ class OutputHandler:
         if "ENV" in results['type']:
             _data = { 'type' : results['type'],
                       'irep' : irep,
+                      'hour' : [env['hour'] for env in results['enviro']],
+                      'minute' : [env['minute'] for env in results['enviro']],
+                      'second' : [env['second'] for env in results['enviro']],
                       'tmp1' : [env['temp1'] for env in results['enviro']],
                       'tmp2' : [env['temp2'] for env in results['enviro']],
                       'tmp3' : [env['temp3'] for env in results['enviro']],
@@ -179,9 +183,10 @@ class OutputHandler:
                               str(results['enviro'][idata]['lumi'])
                             ])
         if "ENV" in results['type']:
-            _data.append(["TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI"])
+            _data.append(["TIME [h-m-s]","TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI [lx]"])
             for data in results['enviro']:
-                _data.append([str(data['temp1']),
+                _data.append([str(data['hour'])+"-"+str(data['minute'])+"-"+str(data['second']),
+                              str(data['temp1']),
                               str(data['temp2']),
                               str(data['temp3']),
                               str(data['humi']),

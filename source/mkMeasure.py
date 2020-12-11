@@ -127,6 +127,69 @@ def dev_list(arg_value):
 
     return _custom_list
 
+def enviro_list(arg_value):
+    #####################################
+    #Define argument type for -g option
+    #####################################
+
+    _custom_list = []
+    if "[" in arg_value and "]" in arg_value:
+        #list was provided explicitely
+        _custom_list = [str(value) for value in arg_value.replace("[","").replace("]","").split(",")]
+    elif "[" not in arg_value and "]" not in arg_value:
+        #list provided without brackets and divided by comma or space, possibly one argument only
+        if len(arg_value.split(",")) > 1:
+            _custom_list = arg_value.split(",")
+        elif len(arg_value.split(" ")) > 1:
+            _custom_list = arg_value.split(" ")
+        else:
+            _custom_list.append(arg_value)
+    else:
+        msg = log("e","Incorrect eviro argument format.")
+        raise argparse.ArgumentTypeError(msg)
+
+    if len(_custom_list) < 1:
+        msg = log("e","Specify type of enviro measurement (all, temp, humi or lumi).")
+        raise argparse.ArgumentTypeError(msg)
+    elif len(_custom_list) == 1:
+        if str(_custom_list[0]) not in ["all","temp","humi","lumi"]:
+            msg = log("e","Allowed values for enviro measurement are \"all, temp, humi or lumi\".")
+            raise argparse.ArgumentTypeError(msg)
+        #setting defaults
+        _custom_list.append(5.0)
+        _custom_list.append(10)
+    elif len(_custom_list) == 2:
+        if str(_custom_list[0]) not in ["all","temp","humi","lumi"]:
+            msg = log("e","Allowed values for enviro measurement are \"all, temp, humi or lumi\".")
+            raise argparse.ArgumentTypeError(msg)
+        if float(_custom_list[1]) < 0.:
+            msg = log("e","Time step cannot be negative function.")
+            raise argparse.ArgumentTypeError(msg)
+        else:
+            _custom_list[1] = float(_custom_list[1])   
+        #setting defaults
+        _custom_list.append(10)
+    elif len(_custom_list) == 3:
+        if str(_custom_list[0]) not in ["all","temp","humi","lumi"]:
+            msg = log("e","Allowed values for enviro measurement are \"all, temp, humi or lumi\".")
+            raise argparse.ArgumentTypeError(msg)     
+        if float(_custom_list[1]) < 0.:
+            msg = log("e","Time step cannot be negative function.")
+            raise argparse.ArgumentTypeError(msg)
+        else:
+            _custom_list[1] = float(_custom_list[1])
+        _stepFloat = float(_custom_list[2])
+        _stepInt = int(_custom_list[2])
+        if abs(_stepFloat-_stepInt) > 0.:
+            log("w","Number of steps in enviro measurement cannot be floating. Truncating down.")
+            _custom_list[2] = _stepInt
+        else:
+            _custom_list[2] = _stepInt 
+        if _custom_list[2] == -1:
+            log("w", "Press CTRL+C to cancel enviro measurement.")
+
+    return _custom_list
+ 
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
@@ -166,6 +229,7 @@ if __name__ == '__main__':
     measGroup.add_argument('-m','--multi',      type=range_list, dest='multi' , metavar='<bias_range>'  , help='Multiple point IV measurement. USAGE: -m start end incr OR -c [1,2,3,4]', action='store', default=None)
     measGroup.add_argument('-c','--continuous', type=range_list, dest='continuous', metavar='<bias_range>', help='Continuous IV measurement. USAGE: -c start end incr OR -c [1,2,3,4]', action='store', default=None)
     measGroup.add_argument('-e','--enviro', type=str, dest='enviro', metavar='<enviro>' , help='Enviro readings: all, temp, humi or lumi.', action='store', default=None)
+    measGroup.add_argument('-g','--contenv', type=enviro_list, dest='contenv', metavar='<cont_enviro>', help='Continuous Enviro measurement. USAGE: -g <type> [<timeStep> <nSteps>]', action='store', default=None)
     parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
     parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
@@ -269,9 +333,17 @@ if __name__ == '__main__':
                                        'type'        : "singleENV",
                                        'subtype'     : str(args.enviro),
                                    }) 
+            if args.contenv is not None:
+                for ir in range(1,args.repeat+1):
+                    sequence.append({
+                                       'type'        : "contENV",
+                                       'subtype'     : str(args.contenv[0]),
+                                       'timeStep'    : float(args.contenv[1]),
+                                       'nSteps'      : int(args.contenv[2])  
+                                   }) 
  
         if len(sequence) == 0 and not args.testPort and not args.testMeas:
-            log("i","No measurement tool was selected. Please select measurement inline (-s | -m | -c).")
+            log("i","No measurement tool was selected. Please select measurement inline (-s | -m | -c | -e | -g).")
             log("i","Alternatively pass configuration file using --cfg <config_file>.")
             sys.exit(0)
         for seq in sequence:
@@ -288,7 +360,10 @@ if __name__ == '__main__':
             if 'subtype' in seq and seq['subtype'] not in ["all","temp","humi","lumi"]:
                 log("e","Unknown environmental reading requested.")
                 sys.exit(0)  
-         
+            if seq['type'] == "contENV":
+                if 'timeStep' in seq and seq['timeStep'] <= 0:
+                    log("e","Time step for enviro measurement must be positive number.")
+                    sys.exit(0)
         #---------------------------------------
         #Do not initialize all devices if only
         #enviro readings are invoked
@@ -405,20 +480,30 @@ if __name__ == '__main__':
     #Provide standalone enviro measurement here if only one
     #-----------------------------------------------------------------
     if args.isEnviroOnly:
-        try:
-            _result = dev.singleENV(str(sequence[0]['subtype']),isLast=True,isFirst=True)
+        if "single" in sequence[0]['type']:
+            try:
+                _result = dev.singleENV(str(sequence[0]['subtype']),isLast=True,isFirst=True)
+                dev.finalize()
+                if isOut: 
+                    _results = { 'type' : sequence[0]['type'], 'data' : [], 'enviro' : [] }
+                    _results['enviro'].append(_result) 
+                    outputHandler.load(0,_results)    
+                    outputHandler.save()
+            except KeyboardInterrupt:
+                log("w","Keyboard interruption during standalone enviro measurement detected!")
+                with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                    dev.abort()
+                    dev.terminate()
+        elif "cont" in sequence[0]['type']:
+            #Keyboard interruption handled internally
+            _result = dev.contENV(str(sequence[0]['subtype']),sequence[0]['timeStep'],sequence[0]['nSteps'],isLast=True,isFirst=True)
             dev.finalize()
-            if isOut: 
+            if isOut:
                 _results = { 'type' : sequence[0]['type'], 'data' : [], 'enviro' : [] }
-                _results['enviro'].append(_result) 
-                outputHandler.load(0,_results)    
-                outputHandler.save()
-        except KeyboardInterrupt:
-            log("w","Keyboard interruption during standalone enviro measurement detected!")
-            with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
-                dev.abort()
-                dev.terminate()
-        sys.exit(0) 
+                _results['enviro'] = _result
+                outputHandler.load(0,_results)
+                outputHandler.save() 
+        sys.exit(0)
 
     #-----------------------------------------------------------------
     #Initialize current sensing until connection is achieved

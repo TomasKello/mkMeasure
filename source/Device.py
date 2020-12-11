@@ -7,10 +7,6 @@ import importlib
 import ColorLogger
 import DelayedKeyboardInterrupt as warden
 
-#def log(log_type="i",text=""):
-#    clogger = ColorLogger.ColorLogger("Device:          ")
-#    return clogger.log(log_type,text)
-
 class Device:
     def __init__(self,args):
         ###########################
@@ -1057,6 +1053,13 @@ class Device:
                         self.log("e","Device providing environmental measurements is required.")
                         self.__terminate__()
                         return False
+
+                    #dry run needed
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                    #real run
                     initTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
                     initHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
                     initLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
@@ -1118,6 +1121,10 @@ class Device:
         #Read out enviro data
         enviro = {}
         preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
+        now = dt.datetime.now()
+        enviro['hour'] = str(now.hour)
+        enviro['minute'] = str(now.minute)
+        enviro['second'] = str(now.second) 
         if dev_type in self.args.addSocket or dev_type in self.args.addPort:
             if mtype == "all":
                 preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
@@ -1163,6 +1170,141 @@ class Device:
                 self.log("h","Manual abort required.")
 
         #Return readings
+        return enviro
+
+    def contENV(self, mtype="all", timeStep = 5, nSteps = 10, isLast=True, isFirst=False):
+        ################################
+        #Continuous enviro measurement
+        ################################
+
+        #initialize pre-requisities if needed
+        dev_type = 'probe'
+        if isFirst and (dev_type in self.args.addSocket or dev_type in self.args.addPort):
+            status, message = self.devs[self.coms[dev_type]['id']].pre(self.coms[dev_type]['com'])
+            self.log(status, message)
+            if status in ["e","f"]:
+                self.__terminate__("EXIT")
+
+        #clear buffer
+        self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+        self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+        self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+        self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+        self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+        #Read out enviro data
+        enviro = []
+        try:
+            if dev_type in self.args.addSocket or dev_type in self.args.addPort:
+                if nSteps >= 0:
+                    for step in range(0,nSteps):
+                        _enviro = { 'hour' : 0, 'minute' : 0, 'second' : 0,
+                                    'temp1' : 0, 'temp2' : 0, 'temp3' : 0,
+                                    'humi' : 0, 'lumi' : 0 } 
+                        now = dt.datetime.now()
+                        _enviro['hour'] = str(now.hour)
+                        _enviro['minute'] = str(now.minute)
+                        _enviro['second'] = str(now.second)
+                        if mtype == "all":
+                            _enviro['temp1'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                            _enviro['temp2'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                            _enviro['temp3'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                            _enviro['humi'] = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                            _enviro['lumi'] = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True)) 
+
+                            self.log("i","Temperature CH0:   "+str(_enviro['temp1']))
+                            self.log("i","Temperature CH1:   "+str(_enviro['temp2']))
+                            self.log("i","Temperature CH2:   "+str(_enviro['temp3']))
+                            self.log("i","Relative humidity: "+str(_enviro['humi'])+"%")
+                            self.log("i","Lux:               "+str(_enviro['lumi']))
+                        elif mtype == "temp":
+                            _enviro['temp1'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                            _enviro['temp2'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                            _enviro['temp3'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                            _enviro['humi'] = "N/A"
+                            _enviro['lumi'] = "N/A"                         
+
+                            self.log("i","Temperature CH0:   "+str(_enviro['temp1']))
+                            self.log("i","Temperature CH1:   "+str(_enviro['temp2']))
+                            self.log("i","Temperature CH2:   "+str(_enviro['temp3']))
+                        elif mtype == "humi":
+                            _enviro['temp1'] = "N/A"
+                            _enviro['temp2'] = "N/A"
+                            _enviro['temp3'] = "N/A"
+                            _enviro['humi'] = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                            _enviro['lumi'] = "N/A"
+
+                            self.log("i","Relative humidity: "+str(_enviro['humi'])+"%")
+                        elif mtype == "lumi":
+                            _enviro['temp1'] = "N/A"
+                            _enviro['temp2'] = "N/A"
+                            _enviro['temp3'] = "N/A"
+                            _enviro['humi'] = "N/A"
+                            _enviro['lumi'] = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+                              
+                            self.log("i","Lux:               "+str(_enviro['lumi']))
+                        enviro.append(_enviro)
+                        time.sleep(timeStep)
+                else:
+                    while True:
+                        _enviro = { 'hour' : 0, 'minute' : 0, 'second' : 0,
+                                    'temp1' : 0, 'temp2' : 0, 'temp3' : 0,
+                                    'humi' : 0, 'lumi' : 0 }
+                        now = dt.datetime.now()
+                        _enviro['hour'] = str(now.hour)
+                        _enviro['minute'] = str(now.minute)
+                        _enviro['second'] = str(now.second)
+                        if mtype == "all":
+                            _enviro['temp1'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                            _enviro['temp2'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                            _enviro['temp3'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                            _enviro['humi'] = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                            _enviro['lumi'] = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                            self.log("i","Temperature CH0:   "+str(_enviro['temp1']))
+                            self.log("i","Temperature CH1:   "+str(_enviro['temp2']))
+                            self.log("i","Temperature CH2:   "+str(_enviro['temp3']))
+                            self.log("i","Relative humidity: "+str(_enviro['humi'])+"%")
+                            self.log("i","Lux:               "+str(_enviro['lumi'])) 
+                        elif mtype == "temp":
+                            _enviro['temp1'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                            _enviro['temp2'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                            _enviro['temp3'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                            _enviro['humi'] = "N/A"
+                            _enviro['lumi'] = "N/A"
+
+                            self.log("i","Temperature CH0:   "+str(_enviro['temp1']))
+                            self.log("i","Temperature CH1:   "+str(_enviro['temp2']))
+                            self.log("i","Temperature CH2:   "+str(_enviro['temp3']))
+                        elif mtype == "humi":
+                            _enviro['temp1'] = "N/A"
+                            _enviro['temp2'] = "N/A"
+                            _enviro['temp3'] = "N/A"
+                            _enviro['humi'] = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                            _enviro['lumi'] = "N/A"
+
+                            self.log("i","Relative humidity: "+str(_enviro['humi'])+"%")
+                        elif mtype == "lumi":
+                            _enviro['temp1'] = "N/A"
+                            _enviro['temp2'] = "N/A"
+                            _enviro['temp3'] = "N/A"
+                            _enviro['humi'] = "N/A"
+                            _enviro['lumi'] = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                            self.log("i","Lux:               "+str(_enviro['lumi']))
+                        time.sleep(timeStep)
+                        enviro.append(_enviro)
+        except KeyboardInterrupt:
+            self.log("w","Continuous environmental measurement interrupted.")
+            pass
+
+        #Finalize measurement
+        if isLast:
+            try:
+                self.__terminate__()
+            except OSError:
+                self.log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                self.log("h","Manual abort required.") 
         return enviro 
 
     def single(self, mtype="IV", mpoint=0, sampleTime=0.50, nSamples=5, isLast=True, isFirst=False):
@@ -1517,6 +1659,14 @@ class Device:
             enviro = {}
             preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
             if 'probe' in self.args.addSocket:
+                #dry run needed
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                #real run 
                 preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
                 preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
                 preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
