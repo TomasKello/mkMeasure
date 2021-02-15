@@ -405,13 +405,17 @@ class Device:
                                             }
             return False    
 
-        #Bias boundaries for the source device
+        #Bias and Current boundaries for the source device
         if self.args.extVSource and not self.args.isEnviroOnly:
-            self.minBias = self.__par__(coms['source'],"minBias")
-            self.maxBias = self.__par__(coms['source'],"maxBias")
+            self.minBias     = self.__par__(coms['source'],"minBias")
+            self.maxBias     = self.__par__(coms['source'],"maxBias")
+            self.maxCurrent  = self.__par__(coms['source'],"maxCurrent")
+            self.userCurrent = self.__par__(coms['meas'],"userCurrent")  #defined for meas only
         elif not self.args.isEnviroOnly:
-            self.minBias = self.__par__(coms['meas'],"minBias")
-            self.maxBias = self.__par__(coms['meas'],"maxBias")    
+            self.minBias     = self.__par__(coms['meas'],"minBias")
+            self.maxBias     = self.__par__(coms['meas'],"maxBias")    
+            self.maxCurrent  = self.__par__(coms['meas'],"maxCurrent") 
+            self.userCurrent = self.__par__(coms['meas'],"userCurrent") 
 
         self.sleep_time = {}
         self.interlock =  {}
@@ -553,6 +557,28 @@ class Device:
                     self.log("i","Measurement device Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")
                     self.log("i","Measurement device Source Voltage limit was set (user) to "+str(limVSet)+".")
 
+        #Setting current limits (trip)
+        if self.args.extVSource:
+            self.__write__(self.__cmd__(self.coms['source'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+            if self.__par__(self.coms['source'],"climitCheckable",vital=True):
+                self.__write__(self.__cmd__(self.coms['source'],"SCURRLIM",arg=self.maxCurrent,vital=True)) #Set maximum current limit
+            if self.args.verbosity > 0:
+                limCSet = self.__read__(self.__cmd__(self.coms['source'],"CURRLIM?"))
+                limCDef = self.__par__(self.coms['source'],"defCurrent")
+                if limCSet:
+                    self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                    self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+        else:
+            self.__write__(self.__cmd__(self.coms['meas'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+            if self.__par__(self.coms['meas'],"climitCheckable",vital=True):
+                self.__write__(self.__cmd__(self.coms['meas'],"SCURRLIM",arg=self.maxCurrent,vital=True)) #Set maximum current limit
+            if self.args.verbosity > 0:
+                limCSet = self.__read__(self.__cmd__(self.coms['meas'],"CURRLIM?"))
+                limCDef = self.__par__(self.coms['meas'],"defCurrent")
+                if limCSet:
+                    self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                    self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+
         #re-enable safe connection by controling z-station only
         if 'zstation' in self.coms:
             if not self.__write__(self.__cmd__(self.coms['zstation'],"SGOTOREL",arg=self.__par__(self.coms['zstation'],"touchPosition"),vital=False)):
@@ -609,8 +635,33 @@ class Device:
                 #TURN OFF BIAS (LIFE HAZARD)
                 self.__write__(self.__cmd__(self.coms[dev_type],"SVOLT",arg="0",vital=_vital))
                 self.__write__(self.__cmd__(self.coms[dev_type],"SOURCE",arg="OFF",vital=_vital))
-            elif "station" in dev_type:    
-                #STOP ALL MOTION (MATERIAL DMG HAZARD)
+            elif "station" in dev_type: 
+                #MOVE STATION IN SAFE PROXIMITY (MATERIAL DMG HAZARD)
+                dev_type_info = dev_type
+                self.__write__(self.__cmd__(self.coms[dev_type],"MOTOR",arg="ON",vital=True))
+                time.sleep(self.sleep_time[dev_type]['medium'])
+                isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms[dev_type],"MOTOR?",vital=True))))
+                if not isMotorOn:
+                    self.log("e",str(dev_type_info).capitalize()+" motor is turned OFF while expected working!")
+                    self.__terminate__("EXIT")
+                else:
+                    if self.args.verbosity > 0:
+                        self.log("i",str(dev_type_info).capitalize()+" motor is ON.")
+
+                #Return z-station to bottom position before finalizing measurement
+                self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
+                motionIsDone = False
+                runTime = 0.
+                runTimeError = 21.
+                while not motionIsDone and runTime < runTimeError:
+                    time.sleep(self.sleep_time['zstation']['long'])
+                    returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                    if len(returnValue) != 0:
+                        motionIsDone = bool(int(returnValue))
+                    runTime += self.sleep_time['zstation']['long']
+                self.__detectMalfunction__(motionIsDone,"zstation")
+
+                #STOP ALL MOTION 
                 self.__write__(self.__cmd__(self.coms[dev_type],"STOP",vital=True))
                 time.sleep(self.sleep_time[dev_type]['medium'])
                 isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms[dev_type],"MOTOR?",vital=True))))
@@ -1733,10 +1784,16 @@ class Device:
             results['data'].append((current,biasPoint))    
             results['enviro'].append(enviro)
 
-            #Emergency break loop in case of amps exceeding maximum level
-            #TODO: read value from library 
-            if current > 100e-6: 
+            #Emergency break loop in case of amps exceeding maximum user set level 
+            if current > float(self.userCurrent)*1e-6: 
                 currentOverflow = True
+                self.log("h","USER CURRENT OVERFLOW! AUTO-ABORT TRIGGERED.")
+                
+                #Turn off bias immediately
+                self.__write__(self.__cmd__(self.coms[source_dev],"SVOLT",arg="0",vital=True))
+                self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="OFF",vital=True))
+
+                #Actually break loop
                 break
 
         #Return z-station to bottom position before finalizing measurement
@@ -1768,6 +1825,8 @@ class Device:
                 self.log("h","Manual abort required.")
 
         #Return to mkMeasure
+        if currentOverflow:
+            self.log("w","Attempted to recover results.")
         return results
 
     def multiIV(self, biasRange, sampleTime, nSamples, isLast=True, isFirst=False):
@@ -1851,8 +1910,20 @@ class Device:
         ############################################################
         self.log("h","EMERGENCY TERMINATE SELECTED")
 
-        #Return z-station to bottom position before finalizing measurement
+        #first put z-station down in controlled way, then terminate all 
         if 'zstation' in self.coms:
+            #turn ON motor in case it is OFF for some reason
+            self.__write__(self.__cmd__(self.coms[dev_type],"MOTOR",arg="ON",vital=True))
+            time.sleep(self.sleep_time[dev_type]['medium'])
+            isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms[dev_type],"MOTOR?",vital=True))))
+            if not isMotorOn:
+                self.log("e",str(dev_type_info).capitalize()+" motor is turned OFF while expected working!")
+                self.__terminate__("EXIT")
+            else:
+                if self.args.verbosity > 0:
+                    self.log("i",str(dev_type_info).capitalize()+" motor is ON.")
+
+            #Return z-station to bottom position before finalizing measurement  
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
             motionIsDone = False
             runTime = 0.

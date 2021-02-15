@@ -19,6 +19,7 @@ cmds['set'] = { 'STIME'    : { 'cmd' : "SYST:TIME ", 'vital' : False},          
                 'SDATE'    : { 'cmd' : "SYST:DATE ", 'vital' : False},                 #@Set current system date
                 'SVOLT'    : { 'cmd' : "SOUR:VOLT ", 'vital' : True},                  #@Set high voltage source to <arg> value
                 'SVOLTLIM' : { 'cmd' : "SOUR:VOLT:LIM ", 'vital' : True},              #@Set voltage limit in absolute value
+                'SCURRLIM' : { 'cmd' : "", 'vital' : False},                           #@Set output current limit, NOTE: possible to switch resistive current limit 
                 'SVRANGE'  : { 'cmd' : "SOUR:VOLT:RANGE ", 'vital' : False},           #@Set voltage range (0-1000), but results in 100 for V<=100 or 1000 if V>100
                 'SENSEF'   : { 'cmd' : "SENS:FUNC ", 'vital' : True},                  #@Set measurement function, see parameter fCurr as possible argument
                 'SSCRANGE' : { 'cmd' : "SENS:CURR:RANG ", 'vital' : False},            #@Set SENS Current range if AUTO range is disabled
@@ -35,6 +36,8 @@ cmds['switch'] = { 'MATH'    : { 'cmd' : "CALC:STAT ", 'vital' : False },       
                    'ZCHECK'  : { 'cmd' : "SYST:ZCH ", 'vital' : False},                 #@Enable/Disable zero check
                    'ZCOR'    : { 'cmd' : "SYST:ZCOR:STAT ", 'vital' : False},           #@Enable/Disable zero correction 
                    'LIMSTAT' : { 'cmd' : "SOUR:VOLT:LIM:STAT ", 'vital' : False},       #@Enable/Disable changes in VSource limits  
+                   'CURRLIM' : { 'cmd' : "SOUR:CURR:RLIM:STAT ", 'vital' : False},      #@Enable/Disable resistive current limit by inserting 1MOhm serial resistance 
+                   'VOLTLIM' : { 'cmd' : "", 'vital' : False},                          #@Enable/Disable resistive voltage limit
                    'SCAUTORANGE'  : { 'cmd' : "SENS:CURR:RANG:AUTO ", 'vital' : False}, #@Enable/Disable SENS Current AUTO Range
                    'TRIGGERINIT'  : { 'cmd' : "INIT:CONT ", 'vital' : True},            #@Enable/Disable continuous trigger initiation
 }
@@ -47,6 +50,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "*IDN?", 'vital' : True },              
                 'ZCOR'      : { 'cmd' : "SYST:ZCOR:STAT?", 'vital' : False},                            #@Get Zero Correct status
                 'SOURCE'    : { 'cmd' : "OUTP?", 'isOK' : ['0'], 'vital' : True},                           #@Check if high voltage source is ON (1) or OFF (0) 
                 'VOLTLIM'   : { 'cmd' : "SOUR:VOLT:LIM?", 'vital' : False},                             #@Get absolute voltage limit set by user 
+                'CURRLIM'   : { 'cmd' : "SOUR:CURR:LIM?", 'vital' : False},                             #@Get if resistance current limit was set by user  
                 'VOLT'      : { 'cmd' : "SOUR:VOLT?", 'vital' : True},                                  #@Get set voltage
                 'SENSEF'    : { 'cmd' : "SENS:FUNC?", 'vital' : False},                                 #@Check SENS function
                 'SCAUTORANGE'  : { 'cmd' : "SENS:CURR:RANG:AUTO?", 'vital' : False},                    #@Check SENS Current AUTO range status (manufacturer)
@@ -71,7 +75,10 @@ cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                  
 
 pars = { 'minBias' : { 'par' : -100, 'vital' : True, 'alt' : "minV" },              #@Extreme minimum voltage to be set on this device (user). Can be set up to -defBias.
          'maxBias' : { 'par' :  100, 'vital' : True, 'alt' : "maxV" },              #@Extreme maximum voltage to be set on this device (user). Can be set up to defBias.
+         'maxCurrent' : { 'par' :  30, 'vital' : True, 'alt' : "maxC" },            #@Extreme maximum output current [muA] to be set on this device (user). Can be set up to defCurrent.
+         'userCurrent' : { 'par' : 30, 'vital' : False, 'alt' : "userC" },          #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
          'defBias' : { 'par' : 1000, 'vital' : True, 'alt' : "defaultMaxV"},        #@Factory settings total (absolute) maximum of voltage to be set on this device (manufacturer)
+         'defCurrent' : { 'par' : 100, 'vital' : True, 'alt' : "defaultMaxC"},      #@Factory settings total maximum of current [muA] to be set on this device (manufacturer) 
          'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                  #@Basic sleep time in seconds needed for proper running of device routines
          'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                  #@Medium sleep time  
          'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                  #@Long sleep time
@@ -83,11 +90,12 @@ pars = { 'minBias' : { 'par' : -100, 'vital' : True, 'alt' : "minV" },          
          'bufferMode'    : { 'par' : 'NEXT', 'vital' : False, 'alt' : ""},          #@Buffer mode, NEXT = fill buffer and stops
          'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},             #@Readout for each sample is devided by this character
          'readoutIdentifier' : { 'par' : "NADC", 'vital' : True, 'alt' : ""},       #@Each readout reading consists of this string
-         'decimalVolt'       : { 'par' : True, 'vital' : True, 'alt' : ""},       #@Check if decimal accuracy for setting volts is allowed
+         'decimalVolt'       : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Check if decimal accuracy for setting volts is allowed
          'interlockCheckable' : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of interlock status
          'inhibitorCheckable' : { 'par' : False,'vital' : True, 'alt' : ""},        #@Checkability of inhibitor status
          'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of voltage limits
+         'climitCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},       #@Checkability of current limits
 }
 
 
