@@ -1785,7 +1785,7 @@ class Device:
             results['enviro'].append(enviro)
 
             #Emergency break loop in case of amps exceeding maximum user set level 
-            if current > float(self.userCurrent)*1e-6: 
+            if abs(current) > abs(float(self.userCurrent))*1e-6: 
                 currentOverflow = True
                 self.log("h","USER CURRENT OVERFLOW! AUTO-ABORT TRIGGERED.")
                 
