@@ -76,7 +76,7 @@ class SerialConnector:
         devices['zstation'] = { 'id'       : "ESP100", 
                                 'model'    : "M-UZM80CC.1",
                                 'type'     : "zstation",  
-                                'port'     : "USB2",     
+                                'port'     : "S0",     
                                 'baudrate' : 19200,
                                 'parity'   : serial.PARITY_NONE,
                                 'stopbits' : serial.STOPBITS_ONE,
@@ -84,6 +84,17 @@ class SerialConnector:
                                 'rtscts'   : 1,
                                 'xonxoff'  : False
                               }
+        devices['probe'] = {   'id'        : "EnvServ",
+                                 'model'     : "V1.4",
+                                 'type'      : "probe",
+                                 'port'      : "ttyACM1",
+                                 'baudrate'  : 9600,
+                                 'parity'    : serial.PARITY_NONE,
+                                 'stopbits'  : serial.STOPBITS_TWO,
+                                 'bytesize'  : serial.EIGHTBITS,
+                                 'rtscts'    : 0,
+                                 'xonxoff'   : True
+        } 
         #devices['other'] = { 'id' : ""           , 'type' : "other",  'port' : ""     }
         return devices
 
@@ -186,7 +197,10 @@ class SerialConnector:
                 self.args.addPort = [ dev_type for dev_type in self.args.addPort if dev_type not in not_used_devices ]    
             else:
                 self.log("i","Automatic port selection activated.")
-                relevantDevs = [key for key in devices.keys() if ( (key == "source" and self.args.extVSource) or (key in self.args.addPort) or key == "meas" )]
+                relevantDevs = [key for key in devices.keys() 
+                                if ( (key == "source" and self.args.extVSource) 
+                                or (key in self.args.addPort) 
+                                or (key == "meas" and not self.args.isEnviroOnly))]
                 relevantPorts = {}
                 usedPorts = []
                 #refresh used ports
@@ -202,7 +216,7 @@ class SerialConnector:
                         relevantPorts[relDev] = [goodAttempts[relDev]] #precisely one
                     else:    
                         relevantPorts[relDev] = [port for port in COM_ports 
-                                                 if (("USB" in port or "ttyS" in port) 
+                                                 if (("USB" in port or "ttyS" in port or "ACM" in port) 
                                                      and ( (relDev in failedAttempts.keys() and port not in failedAttempts[relDev]) or 
                                                            relDev not in failedAttempts.keys()
                                                          )
@@ -214,7 +228,7 @@ class SerialConnector:
                         if len(relevantPorts[relDev]) == 0:
                             failedAttempts[relDev] = []
                             relevantPorts[relDev] = [port for port in COM_ports
-                                                     if (("USB" in port or "ttyS" in port) and port not in usedPorts)
+                                                     if (("USB" in port or "ttyS" in port or "ACM" in port) and port not in usedPorts)
                                                     ]
 
                     isDefault = False
@@ -247,12 +261,13 @@ class SerialConnector:
                             usedPorts.append(port)
                             break
 
-        if self.args.extVSource:
-            self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
-            self.log("i","External VSource: ID=%s, port=%s"%(selected_ports['source']['id'],selected_ports['source']['port']))
-        else:
-            self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
-            self.log("i","External VSource port: not used")
+        if not self.args.isEnviroOnly:  
+            if self.args.extVSource:
+                self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
+                self.log("i","External VSource: ID=%s, port=%s"%(selected_ports['source']['id'],selected_ports['source']['port']))
+            else:
+                self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
+                self.log("i","External VSource port: not used")
         for key in selected_ports.keys():
             if key not in ['meas','source']:
                 self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port'])) 
@@ -294,22 +309,24 @@ class SerialConnector:
 
         COMS = {}
         ports = self.__detect_RS232__(failedAttempts, goodAttempts)
-        
         #setup communication
         try:
-            COMS['meas'] = self.__set_RS232__(ports['meas'])
-            if self.args.extVSource:
-                COMS['source'] = self.__set_RS232__(ports['source'])
+            if not self.args.isEnviroOnly:
+                COMS['meas'] = self.__set_RS232__(ports['meas'])
+                if self.args.extVSource:
+                    COMS['source'] = self.__set_RS232__(ports['source'])
             for dev_type in self.args.addPort:
                 COMS[dev_type] = self.__set_RS232__(ports[dev_type])
-        except KeyError:
+        except KeyError as e:
             self.log("f","Port selection failed during bit exchange. Repeat selection.")
+            self.log("f","Missing key: "+str(e)) 
             sys.exit(0)
     
         #initialize communication
-        COMS['meas']['com'] = self.__open_RS232__(COMS['meas']['com'])
-        if self.args.extVSource:
-            COMS['source']['com'] = self.__open_RS232__(COMS['source']['com'])
+        if not self.args.isEnviroOnly:  
+            COMS['meas']['com'] = self.__open_RS232__(COMS['meas']['com'])
+            if self.args.extVSource:
+                COMS['source']['com'] = self.__open_RS232__(COMS['source']['com'])
         for dev_type in self.args.addPort:
             COMS[dev_type]['com'] = self.__open_RS232__(COMS[dev_type]['com']) 
 

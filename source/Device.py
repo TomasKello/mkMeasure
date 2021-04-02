@@ -83,7 +83,6 @@ class Device:
                     self.log("e","Please use --selectPort again to select ports manually in case your class is not outdated.")
                     sys.exit(0)
                 else:
-                    print(real_id) 
                     self.log("w","Device ID="+com['id']+" not matched. Retry...")
                     real_id = "FAILED"
             else:
@@ -416,13 +415,12 @@ class Device:
             self.maxBias     = self.__par__(coms['meas'],"maxBias")    
             self.maxCurrent  = self.__par__(coms['meas'],"maxCurrent") 
             self.userCurrent = self.__par__(coms['meas'],"userCurrent") 
-
+        
         self.sleep_time = {}
         self.interlock =  {}
         self.stations = 0
         dev_type_info = ""
         for dev_type in coms:
-
             #Setup measurement device and HVSource
             if dev_type in ['meas','source']:
                 if not self.args.extVSource and dev_type == 'source': continue
@@ -447,7 +445,6 @@ class Device:
 
             #Zero Check Interlock (safeMode=False)
             self.__checkInterlock__(dev_type)
-
             #Setup xyz station(s)
             if "station" in dev_type:
                 self.stations += 1
@@ -792,7 +789,47 @@ class Device:
                 self.__terminate__("EXIT")
             
         #Return success if all is OK
-        return { 'success' : 1 } 
+        return { 'success' : 1 }
+
+    def load_serial(self,COMS,EMG):
+        ###########################################################
+        #Global function intended to be used only without devices 
+        #of type meas or source. E.g. probe
+        ###########################################################   
+        try:
+            OTHER_DEV_NAMES = {}
+            for dev_type in self.args.addPort:
+                OTHER_DEV_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(COMS[dev_type])
+
+            loadStatus = {}
+            for dev_type in self.args.addPort:
+                if "FAILED" in OTHER_DEV_NAMES[dev_type]:
+                    loadStatus[dev_type] = (self.coms[dev_type]['port'],0)
+                else:
+                    loadStatus[dev_type] = (self.coms[dev_type]['port'],1)
+            allOK = True
+            for key in loadStatus.keys():
+                port,valid = loadStatus[key]
+                if valid == 0 or valid == 2:
+                    allOK = False
+            if not allOK: return loadStatus
+        except KeyboardInterrupt:
+            self.log("w","Keyboard interruption during port selection detected.")
+            sys.exit(0)
+        except Exception as e:
+            self.log("f",str(e))
+            sys.exit(0)
+
+        #Initialize sequence
+        try:
+            self.__initDevice__(self.coms,EMG)
+        except KeyboardInterrupt:
+            self.log("w","Keyboard interruption during device initialization detected.")
+            with warden.DelayedKeyboardInterrupt(force=False, logfile=self.args.logname):
+                self.__terminate__("EXIT")
+
+        #Return success if all is OK
+        return { 'success' : 1 }
 
     def load(self,COMS,SOCKETS,EMG):
         ########################################################
@@ -1100,7 +1137,7 @@ class Device:
                     isReady  = True
                 else: 
                     #check environmental conditions
-                    if 'probe' not in self.args.addSocket:
+                    if 'probe' not in self.args.addSocket and 'probe' not in self.args.addPort:
                         self.log("e","Device providing environmental measurements is required.")
                         self.__terminate__()
                         return False
@@ -1483,7 +1520,7 @@ class Device:
         #Read out enviro data
         enviro = {}
         preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
-        if 'probe' in self.args.addSocket:
+        if 'probe' in self.args.addSocket or 'probe' in self.args.addPort:
             preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
             preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
             preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
@@ -1709,7 +1746,7 @@ class Device:
             #Read out enviro data
             enviro = {}
             preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
-            if 'probe' in self.args.addSocket:
+            if 'probe' in self.args.addSocket or 'probe' in self.args.addPort:
                 #dry run needed
                 self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
                 self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))

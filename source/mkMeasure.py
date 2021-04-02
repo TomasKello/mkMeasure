@@ -373,13 +373,19 @@ if __name__ == '__main__':
             _isEnviroOnly = True
         args.isEnviroOnly = _isEnviroOnly
 
+        #-----------------------------------------------
+        #Source can be specified also as port directly 
+        #-----------------------------------------------
+        if "source" in args.addPort: 
+            args.extVSource = True
+
     #---------------------------------------
     #Initialize connector and device classes
     #---------------------------------------
     connectorSerial = SerialConnector.SerialConnector(args)
     connectorSocket = SocketConnector.SocketConnector(args)
     dev             = Device.Device(args)
-    
+
     #-------------------------
     #1: PORT AVAILABILITY TEST
     #-------------------------
@@ -420,9 +426,16 @@ if __name__ == '__main__':
         #-----------------------------------------------------------------
         try:
             if not args.isEnviroOnly:
-                dev.load(COMS,SOCKETS,EMG)
+                dev.load(COMS,SOCKETS,EMG)                   
             else:
-                dev.load_socket(SOCKETS,EMG) 
+                if len(args.addPort) == 0:
+                    dev.load_socket(SOCKETS,EMG)
+                else:
+                    _COMS = {}
+                    for dev_type in args.addPort:
+                        _COMS[dev_type] = COMS[dev_type]
+                    COMS = _COMS
+                    dev.load(COMS,SOCKETS,EMG)  
         except KeyboardInterrupt:
             log("w","Keyboard interruption during device loading detected.")
             sys.exit(0)
@@ -451,13 +464,44 @@ if __name__ == '__main__':
                     elif valid == 1:
                             goodAttempts[key] = _port
 
-    else:
-        SOCKETS = connectorSocket.gateway()
-        try:
-            dev.load_socket(SOCKETS,EMG)
-        except KeyboardInterrupt:
-            log("w","Keyboard interruption during device loading detected.")
-            sys.exit(0)
+    elif doRetry and args.isEnviroOnly:
+        #ignore other devices as meas or source 
+
+        if len(args.addPort) == 0: 
+            #only sockets
+            SOCKETS = connectorSocket.gateway()
+            try:
+                dev.load_socket(SOCKETS,EMG)
+            except KeyboardInterrupt:
+                log("w","Keyboard interruption during device loading detected.")
+                sys.exit(0)
+        elif len(args.addSocket) == 0:
+            #only ports
+            COMS = {}
+            allMatched = False
+            failedAttempts = {}
+            goodAttempts = {}
+            while not allMatched:
+                _COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts)
+                for dev_type in args.addPort:
+                    COMS[dev_type] = _COMS[dev_type]
+                log("i","Use CTRL+C to cancel automatic selecion.")
+
+                #Keyboard exception is controlled internally
+                attempt = dev.load_serial(COMS, EMG) 
+                if "success" in attempt.keys():
+                    allMatched = True
+                else:
+                    for key in attempt.keys():
+                        _port,valid = attempt[key]
+                        if valid == 0:
+                            if key not in failedAttempts.keys():
+                                failedAttempts[key] = []
+                                failedAttempts[key].append(_port)
+                            else:
+                                failedAttempts[key].append(_port)
+                        elif valid == 1:
+                                goodAttempts[key] = _port
 
     #-----------------------------------------------------------------
     #Raise argument invoked emergency functions here

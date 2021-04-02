@@ -3,13 +3,14 @@
 import os, sys
 import time
 import datetime as dt
+import socket
 
 ########################################################
 #----------------------COMMANDS------------------------#
 ########################################################
 
 #Note: 'vital' = False indicates that 'cmd' can be left empty.
-#      If 'vital' = False and Device class requires 'vital' = True
+#      If 'vital' = False and Device class requires 'vital' = True 
 #      error is raised.
 
 cmds = {}
@@ -19,13 +20,13 @@ cmds['set'] = { 'STIME'    : { 'cmd' : "", 'vital' : False},                    
                 'SDATE'    : { 'cmd' : "", 'vital' : False},                    #@Set current system date
                 'SENSEF'   : { 'cmd' : "", 'vital' : True},                  #@Set measurement function, see parameter fCurr as possible argument
                 'BUFFSIZE' : { 'cmd' : "", 'vital' : True },               #@Set buffer memory size
-                'FILLBUFF' : { 'cmd' : "", 'vital' : True},             #@Set how buffer is filled
+                'FILLBUFF' : { 'cmd' : "", 'vital' : True},             #@Set how buffer is filled 
 }
 
 #"Switch commands" switch between ON and OFF states
 cmds['switch'] = { 'MATH'    : { 'cmd' : "", 'vital' : False },               #@Disable/Enable math operations
                    'ZCHECK'  : { 'cmd' : "", 'vital' : False},                 #@Enable/Disable zero check
-                   'ZCOR'    : { 'cmd' : "", 'vital' : False},           #@Enable/Disable zero correction
+                   'ZCOR'    : { 'cmd' : "", 'vital' : False},           #@Enable/Disable zero correction 
                    'TRIGGERINIT'  : { 'cmd' : "", 'vital' : True},            #@Enable/Disable continuous trigger initiation
 }
 
@@ -49,9 +50,9 @@ cmds['do'] = { 'CMDINIT' : { 'cmd' : "", 'vital' : False},              #@Some d
                'CLRBUFF' : { 'cmd' : "", 'vital' : True},               #@Clear buffer
                'TRIGGERABORT' : { 'cmd' : "", 'vital' : False},         #@Abort operations and send trigger to idle
                'REMOTE'  : { 'cmd' : "", 'vital' : True},               #@Set device to remote control and disable front panel
-               'LOCAL'   : { 'cmd' : "", 'vital' : True},               #@Set device to local control and enable front panel
-               'STOP'    : { 'cmd' : "*STOP", 'vital' : True},          #@Terminate server
-
+               'LOCAL'   : { 'cmd' : "", 'vital' : True},               #@Set device to local control and enable front panel 
+               'STOP'    : { 'cmd' : "*STOP", 'vital' : True},          #@Terminate server          
+               
             }
 
 ########################################################
@@ -59,7 +60,7 @@ cmds['do'] = { 'CMDINIT' : { 'cmd' : "", 'vital' : False},              #@Some d
 ########################################################
 
 pars = { 'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                        #@Basic sleep time in seconds needed for proper running of device routines
-         'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                        #@Medium sleep time
+         'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                        #@Medium sleep time  
          'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                        #@Long sleep time
          'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},                   #@Readout for each sample is devided by this character
          'interlockCheckable' : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of interlock status
@@ -74,19 +75,13 @@ pars = { 'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },              
 
 class EnvServ():
     def __init__(self):
-        # -----------------------------------------------
-        #Device-specific class for RS232 Enviro probes
-        # -----------------------------------------------
-
-        # delimitor
-        self.delim = '\r'
-
-        # sleep constants
-        self.sleep_time = 0.5
-        self.medium_sleep_time = 1.5
-        self.long_sleep_time = 3.0
-
-        # time
+        ################################################
+        #Device-specific class for KEITHLEY model K6517A
+        ################################################
+        self.delim = '\r\n'
+        self.sleep_time = pars['tShort']['par']
+        self.medium_sleep_time = pars['tMedium']['par']
+        self.long_sleep_time = pars['tLong']['par']
         now = dt.datetime.now()
         self.year = str(now.year)
         self.month = str(now.month)
@@ -94,6 +89,14 @@ class EnvServ():
         self.hr = str(now.hour)
         self.min = str(now.minute)
         self.sec = str(now.second)
+        #TODO: run selfcheck on cmds: if 'cmd' is empty, set 'vital' to False, then add crosscheck in self.cmd
+
+        #run server
+        #import subprocess
+        #exe = sys.executable
+        #exeDir = exe[:exe.rfind("/")]
+        #subprocess.Popen([exeDir+"/SensBoxEnvSer"])
+        #time.sleep(5)
 
     def test(self):
         ######################################################
@@ -101,15 +104,18 @@ class EnvServ():
         ######################################################
         return "EnvServ"
 
-    def cmd(self, cmd_type, arg="", cat=""):
-        # ------------------------------
-        # Return device-specific command
-        # ------------------------------
-
-        cmd = ""
+    def cmd(self,cmd_type,arg="",cat=""):
+        ###############################
+        #Return device-specific command
+        ###############################
+        
+        cmd= "" 
         if cmd_type in cmds[cat]:
-            if cat == "switch" or cat == "set":
-                cmd = cmds[cat][cmd_type]['cmd']+str(arg)
+            if cat == "set":
+                if len(cmds[cat][cmd_type]['cmd']) != 0: 
+                    cmd = cmds[cat][cmd_type]['cmd']+str(arg)
+                else:
+                    cmd = ""
             else:
                 cmd = cmds[cat][cmd_type]['cmd']
                 if 'isOK' in cmds[cat][cmd_type]:
@@ -129,10 +135,10 @@ class EnvServ():
 
         return (cmd,[],[])
 
-    def par(self, par_type):
-        # -------------------------------
-        # Return device-specific constants
-        # -------------------------------
+    def par(self,par_type):
+        #################################
+        #Return device-specific constants
+        #################################
         _par = ""
         if par_type in pars:
             _par = pars[par_type]['par']
@@ -141,29 +147,48 @@ class EnvServ():
                 if par_type == pars[key]['alt']:
                     _par = pars[key]['par']
 
-        return _par
+        return _par    
 
-    def write(self, com, cmd):
-        # -------------------------------------------
-        # Define device-specific 'write' routine here
-        # -------------------------------------------
-        time.sleep(self.sleep_time)
-        write_status = com.write((cmd+self.delim).encode())
-        return write_status
+    def write(self,com,cmd):
+        ############################################
+        #Define device-specific 'write' routine here
+        ############################################
 
-    def read(self, com, cmd):
-        # ------------------------------------------
-        # Define device-specific 'read' routine here
-        # ------------------------------------------
-        time.sleep(self.sleep_time)
-        com.write((cmd+self.delim).encode())
-        time.sleep(self.medium_sleep_time)
-        read_value = ""
-        while com.inWaiting() > 0:
-            part = com.read(1).decode().strip('\r')
-            read_value += part
-        return read_value.rstrip()
+        HOST = com['host']  # The server's hostname or IP address
+        PORT = com['port']  # The port used by the server
 
+        write_status = False
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect((HOST, PORT))
+            except ConnectionRefusedError:
+                return "REFUSED"
+            s.sendall(cmd.encode())
+            time.sleep(self.sleep_time) 
+            write_status = True
+
+        return write_status    
+            
+    def read(self,com,cmd):
+        ###########################################
+        #Define device-specific 'read' routine here
+        ###########################################
+     
+        HOST = com['host']  # The server's hostname or IP address
+        PORT = com['port']  # The port used by the server
+
+        return_value = ""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect((HOST, PORT))
+            except ConnectionRefusedError:
+                return "REFUSED"
+            s.sendall(cmd.encode())
+            time.sleep(self.sleep_time)
+            return_value = s.recv(1024)
+
+        return return_value.decode().rstrip()
+ 
     def pre(self,com):
         ####################################################
         #Define device-specific pre-measurement routine here
@@ -176,6 +201,4 @@ class EnvServ():
         message = self.test()+": "
 
 
-        return status,message
-
-
+        return status,message    
