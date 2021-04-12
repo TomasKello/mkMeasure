@@ -900,6 +900,21 @@ class Device:
         #Return success if all is OK
         return { 'success' : 1 }
 
+    def status(self):
+        #############################################################
+        #Return intrinsic status of all connected devices
+        #############################################################
+
+        status = {}
+        for dev_type in self.coms.keys():
+            _status = self.__read__(self.__cmd__(self.coms[dev_type],"STATUS?",vital=False))
+            
+            #TODO: some manipulation with returned value? 
+
+            status[dev_type] = _status
+  
+        return status
+
     def sense(self,connectTimeError=0, fullManual=False):
         #############################################################
         #Global function called from mkMeasure providing real time
@@ -1950,15 +1965,15 @@ class Device:
         #first put z-station down in controlled way, then terminate all 
         if 'zstation' in self.coms:
             #turn ON motor in case it is OFF for some reason
-            self.__write__(self.__cmd__(self.coms[dev_type],"MOTOR",arg="ON",vital=True))
-            time.sleep(self.sleep_time[dev_type]['medium'])
-            isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms[dev_type],"MOTOR?",vital=True))))
+            self.__write__(self.__cmd__(self.coms['zstation'],"MOTOR",arg="ON",vital=True))
+            time.sleep(self.sleep_time['zstation']['medium'])
+            isMotorOn = bool(int(self.__read__(self.__cmd__(self.coms['zstation'],"MOTOR?",vital=True))))
             if not isMotorOn:
-                self.log("e",str(dev_type_info).capitalize()+" motor is turned OFF while expected working!")
+                self.log("e","Z-station motor is turned OFF while expected working!")
                 self.__terminate__("EXIT")
             else:
                 if self.args.verbosity > 0:
-                    self.log("i",str(dev_type_info).capitalize()+" motor is ON.")
+                    self.log("i","Z-station motor is ON.")
 
             #Return z-station to bottom position before finalizing measurement  
             self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
