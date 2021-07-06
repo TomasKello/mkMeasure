@@ -1,4 +1,5 @@
 import os,sys
+import select
 import logging
 
 class Colors:
@@ -23,6 +24,9 @@ class StreamToLogger(object):
    def write(self, buf):
       for line in buf.rstrip().splitlines():
          self.logger.log(self.log_level, line.rstrip())
+
+   def flush(self):
+    pass
 
 class ColorLogger(Colors):
     ############################################################
@@ -75,12 +79,20 @@ class ColorLogger(Colors):
             elif "t" in log_type and "tt" not in log_type:
                 print(self.INPUT,"<<     ",text,self.ENDC)
                 print("<<     ",text,file=self.filelog)
-            elif "tt" in log_type:
+            elif "tt" in log_type and "ttt" not in log_type:
                 _input = input(self.INPUT+text+"  >>"+self.ENDC)
                 print(text+"  >>",file=self.filelog)
                 print(str(_input),file=self.filelog)          
                 return _input
-
+            elif "ttt" in log_type:
+                print(self.INPUT+text+"  >>"+self.ENDC)
+                print(text+"  >>",file=self.filelog)
+                _input,_output,_error = select.select( [sys.stdin], [], [], 5 )
+                if (_input): 
+                    return sys.stdin.readline().strip()
+                else:
+                    return ''               
+ 
             #apply changes to logfile
             self.filelog.close()
 

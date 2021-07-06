@@ -71,17 +71,41 @@ class InputParser:
                                         _list = []
                                         _list.append(seq[att])
                                         seq[att] = _list
-                            if hasAllAttr:    
+                            if hasAllAttr:
+                                standByMode = False
+                                if 'waitingTime' in seq.keys(): standByMode = True     
                                 for irep in range(0,int(seq['repeat'])):
-                                    self.config.append({ 
-                                                          'type'       : seq['type'],
-                                                          'bias'       : seq['bias'],
-                                                          'sampleTime' : seq['sampleTime'],
-                                                          'nSamples'   : seq['nSamples']
-                                                       })
+                                    _oneSeq = {
+                                                'type'       : seq['type'],
+                                                'bias'       : seq['bias'],
+                                                'sampleTime' : seq['sampleTime'],
+                                                'nSamples'   : seq['nSamples']
+                                              }
+                                    if standByMode:
+                                        _oneSeq['waitingTime'] = seq['waitingTime']  
+                                    self.config.append(_oneSeq) 
                             else:
                                 self.log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
                                 sys.exit(0)
+                        elif 'standbyZ' in seq['type']:
+                            hasAllAttr = True
+                            for att in ['waitingTime']:
+                                if att not in seq:
+                                    hasAllAttr = False
+                                else:
+                                    if not isinstance(seq[att], int):
+                                        if isinstance(seq[att], list) and len(seq[att]) >= 1:
+                                            _val = seq[att][0]
+                                            seq[att] = _val
+                            if hasAllAttr:
+                                _oneSeq = {
+                                           'type'        : seq['type'],
+                                           'waitingTime' : seq['waitingTime']
+                                          }
+                                self.config.append(_oneSeq)
+                            else:
+                                self.log("e","StandByZ-type of measurement requires: \'waitingTime\' parameter.")
+                                sys.exit(0) 
                         else:
                             self.log("e","Unknown measurement type: "+str(seq['type']))
                             sys.exit(0)
@@ -116,15 +140,39 @@ class InputParser:
                                         _list.append(seq[att])
                                         seq[att] = _list
                             if hasAllAttr:
+                                standByMode = False
+                                if 'waitingTime' in seq.keys(): standByMode = True
                                 for irep in range(0,int(seq['repeat'])):
-                                    self.config.append({
-                                                          'type'       : seq['type'],
-                                                          'bias'       : seq['bias'],
-                                                          'sampleTime' : seq['sampleTime'],
-                                                          'nSamples'   : seq['nSamples']
-                                                       })
+                                    _oneSeq = {
+                                                'type'       : seq['type'],
+                                                'bias'       : seq['bias'],
+                                                'sampleTime' : seq['sampleTime'],
+                                                'nSamples'   : seq['nSamples']
+                                              }
+                                    if standByMode:
+                                        _oneSeq['waitingTime'] = seq['waitingTime']
+                                    self.config.append(_oneSeq) 
                             else:
                                 self.log("e","IV-type of measurement requires: \'bias\',\'sampleTime\' and \'nSamples\' parameters.")
+                                sys.exit(0)
+                        elif 'standbyZ' in seq['type']:
+                            hasAllAttr = True
+                            for att in ['waitingTime']:
+                                if att not in seq:
+                                    hasAllAttr = False
+                                else:
+                                    if not isinstance(seq[att], int):
+                                        if isinstance(seq[att], list) and len(seq[att]) >= 1:
+                                            _val = seq[att][0]
+                                            seq[att] = _val
+                            if hasAllAttr:
+                                _oneSeq = {
+                                           'type'        : seq['type'],
+                                           'waitingTime' : seq['waitingTime']
+                                          }
+                                self.config.append(_oneSeq)
+                            else:
+                                self.log("e","StandByZ-type of measurement requires: \'waitingTime\' parameter.")
                                 sys.exit(0)
                         else:
                             self.log("e","Unknown measurement type: "+str(seq['type']))
@@ -152,5 +200,7 @@ class InputParser:
                 if "IV" in seq['type']:
                     self.log("i","    TYPE: "+seq['type'])
                     self.log("i","        BIAS: "+str(seq['bias']))
+                    if "waitingTime" in seq.keys():
+                        self.log("i","        STANDBY: "+str(seq['waitingTime'])) 
         return self.config
 

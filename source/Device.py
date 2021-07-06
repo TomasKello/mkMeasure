@@ -405,12 +405,12 @@ class Device:
             return False    
 
         #Bias and Current boundaries for the source device
-        if self.args.extVSource and not self.args.isEnviroOnly:
+        if self.args.extVSource and not self.args.isEnviroOnly and not self.args.isStandByZOnly:
             self.minBias     = self.__par__(coms['source'],"minBias")
             self.maxBias     = self.__par__(coms['source'],"maxBias")
             self.maxCurrent  = self.__par__(coms['source'],"maxCurrent")
             self.userCurrent = self.__par__(coms['meas'],"userCurrent")  #defined for meas only
-        elif not self.args.isEnviroOnly:
+        elif not self.args.isEnviroOnly and not self.args.isStandByZOnly:
             self.minBias     = self.__par__(coms['meas'],"minBias")
             self.maxBias     = self.__par__(coms['meas'],"maxBias")    
             self.maxCurrent  = self.__par__(coms['meas'],"maxCurrent") 
@@ -498,8 +498,39 @@ class Device:
 
         #notify user to position probe manually           
         if self.stations == 0 and not self.args.isEnviroOnly:
-            self.log("w","No station device is used. User is expected to ensure bias ring connection manually.")
+            self.log("w","No station device is used. User is expected to ensure bias connection manually.")
 
+    def __prepMeasurementExternal__(self):
+        ################################################################
+        #Prepare measurement when external measurement device is used.
+        ################################################################
+ 
+        #Run device specific pre-routine if specified by device-specific class (for all)
+        for dev_type in self.coms:
+            status, message = self.devs[self.coms[dev_type]['id']].pre(self.coms[dev_type]['com'])
+            self.log(status, message)
+            if status in ["e","f"]:
+                self.__terminate__("EXIT")
+
+        #TODO: add options for using extVSource as well
+
+        #re-enable safe connection by controling z-station only
+        if 'zstation' in self.coms:
+            if not self.__write__(self.__cmd__(self.coms['zstation'],"SGOTOREL",arg=self.__par__(self.coms['zstation'],"touchPosition"),vital=False)):
+                self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"touchPosition"),vital=True))
+            motionIsDone = False
+            runTime = 0.
+            runTimeError = 15.
+            while not motionIsDone and runTime < runTimeError:
+                time.sleep(self.sleep_time['zstation']['long'])
+                returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                if len(returnValue) != 0:
+                    motionIsDone = bool(int(returnValue))
+                runTime += self.sleep_time['zstation']['long']
+            self.__detectMalfunction__(motionIsDone,"zstation")
+        else:
+            self.log("w","If not done manually, probe is not touching sensor.")
+        
     def __prepMeasurement__(self):
         ################################################################
         #Run sequence of commands in order to prepare measurement device 
@@ -840,7 +871,8 @@ class Device:
         #SOCKETS = socket connections 
         ########################################################
         try:
-            DEV_MEAS_NAME,self.coms['meas'] = self.__getResponse__(COMS['meas']) 
+            if not self.args.isStandByZOnly:
+                DEV_MEAS_NAME,self.coms['meas'] = self.__getResponse__(COMS['meas']) 
             if self.args.extVSource:
                 DEV_SOURCE_NAME,self.coms['source'] = self.__getResponse__(COMS['source'])
             OTHER_DEV_NAMES = {}
@@ -851,10 +883,11 @@ class Device:
                 OTHER_SOCKET_NAMES[dev_type],self.coms[dev_type] = self.__getResponse__(SOCKETS[dev_type])
       
             loadStatus = {}
-            if "FAILED" in DEV_MEAS_NAME:
-                loadStatus['meas'] = (self.coms['meas']['port'],0)
-            else:
-                loadStatus['meas'] = (self.coms['meas']['port'],1)            
+            if not self.args.isStandByZOnly:
+                if "FAILED" in DEV_MEAS_NAME:
+                    loadStatus['meas'] = (self.coms['meas']['port'],0)
+                else:
+                    loadStatus['meas'] = (self.coms['meas']['port'],1)            
             if self.args.extVSource and "FAILED" in DEV_SOURCE_NAME:
                 loadStatus['source'] = (self.coms['source']['port'],0)
             elif self.args.extVSource and "FAILED" not in DEV_SOURCE_NAME:
@@ -914,6 +947,72 @@ class Device:
             status[dev_type] = _status
   
         return status
+
+    def senseExternal(self, connectTimeError=0):
+        #############################################################
+        #Global function called from mkMeasure.
+        #Wait until connection is established and 
+        #checked by external device.
+        #No measurement device needed.
+        #############################################################
+        
+        isConnected = False
+        if connectTimeError >= 0:
+            #Wait until user confirms connection
+            self.log("i","##################################################")
+            self.log("i","#Please establish connection with measured sensor.")
+            self.log("i","#To cancel manual sensing mode press \"n\".")
+            self.log("i","##################################################")
+
+            userInput = ""
+            connectTime = 0 
+            testTimeError = True
+            while not isConnected and testTimeError:
+                if connectTimeError == 0: testTimeError = True
+                elif connectTimeError > 0: testTimeError = bool(connectTime < connectTimeError) 
+                userInput = self.log("tt","Press \"y\" to CONFIRM connection was established: ")
+                try:
+                    userInput.lower()
+                except AttributeError:
+                    self.log("w","Common! I said press \"n\" to cancel...")
+                    userInput = ""
+                if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["y","f"]:
+                    isConnected = True
+                elif len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] == "n":
+                    self.log("w","Bias connection not established. Measurement interrupted by user.")
+                    self.__terminate__()
+                    return False
+
+                time.sleep(1)
+                connectTime += 1
+
+        #In case of connection, move table to ready to connect relative position before closing box
+        if not isConnected:
+            self.log("w","Failed to establish bias connection. Repeat sensing.")
+            self.__terminate__()
+            return False
+        else:
+            self.log("i","Bias connection established.")
+        time.sleep(2)
+        if 'zstation' in self.coms:
+            if not self.__write__(self.__cmd__(self.coms['zstation'],"SGOTOREL",arg=self.__par__(self.coms['zstation'],"detouchPosition"),vital=False)):
+                self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"detouchPosition"),vital=True))
+            motionIsDone = False
+            runTime = 0.
+            runTimeError = 15.
+            while not motionIsDone and runTime < runTimeError:
+                time.sleep(self.sleep_time['zstation']['long'])
+                returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                if len(returnValue) != 0:
+                   motionIsDone = bool(int(returnValue))
+                runTime += self.sleep_time['zstation']['long']
+            self.__detectMalfunction__(motionIsDone,"zstation")
+        else:
+            self.log("w","If not removed manually, probe is now touching sensor.")
+
+        return True
+
+
 
     def sense(self,connectTimeError=0, fullManual=False):
         #############################################################
@@ -1034,7 +1133,7 @@ class Device:
                         if abs(current) > residualCurrent:
                             isConnected = True
                 elif len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] == "n":
-                    self.log("w","Bias ring connection not established. Measurement interrupted by user.")
+                    self.log("w","Bias connection not established. Measurement interrupted by user.")
                     self.__terminate__()
                     return False
 
@@ -1154,6 +1253,24 @@ class Device:
                     #check environmental conditions
                     if 'probe' not in self.args.addSocket and 'probe' not in self.args.addPort:
                         self.log("e","Device providing environmental measurements is required.")
+
+                        #Return z-station to bottom position before finalizing measurement
+                        if 'zstation' in self.coms:
+                            self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
+                            motionIsDone = False
+                            runTime = 0.
+                            runTimeError = 21.
+                            while not motionIsDone and runTime < runTimeError:
+                                time.sleep(self.sleep_time['zstation']['long'])
+                                returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                                if len(returnValue) != 0:
+                                    motionIsDone = bool(int(returnValue))
+                                runTime += self.sleep_time['zstation']['long']
+                            self.__detectMalfunction__(motionIsDone,"zstation")
+                        else:
+                            self.log("h","Probe is still touching sensor!")   
+
+                        #Finalize
                         self.__terminate__()
                         return False
 
@@ -1938,7 +2055,367 @@ class Device:
                                      })
 
         return results    
-           
+
+    def standbyZ(self, waitingTime=-1, isLast=True, isFirst=False):
+        #############################################################
+        #Global function called from mkMeasure.
+        #Will initiate z-station and move it to position as for IV.
+        #Then program will hangout for waitingTime > 0.
+        #If waitingTime == -1 program will wait until cancelled.
+        #############################################################
+
+        #Set remote control
+        self.__setRemote__()
+
+        #Crosscheck interlock
+        self.__checkInterlock__(safeMode=True)
+
+        #Prepare device before first usage
+        if isFirst and isLast:
+            self.__prepMeasurementExternal__()
+        elif isFirst:
+            self.__prepMeasurement__()   
+
+        #Clear enviro buffer if needed
+        if 'probe' in self.coms.keys():
+            self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+            self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+            self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+            self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+            self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True)) 
+
+        #Loop for waitingTime or until cancelled or emergency
+        initialTime = dt.datetime.now()
+        iround = 0
+        deltaTime = 0
+        enviro = [] 
+        while waitingTime >= deltaTime or waitingTime == -1:
+            #Read out enviro data if needed
+            if 'probe' in self.coms.keys():
+                _enviro = { 'hour' : 0, 'minute' : 0, 'second' : 0,
+                            'temp1' : 'N/A', 'temp2' : 'N/A', 'temp3' : 'N/A',
+                            'humi' : 'N/A', 'lumi' : 'N/A' }
+                now = dt.datetime.now()
+                _enviro['hour'] = str(now.hour)
+                _enviro['minute'] = str(now.minute)
+                _enviro['second'] = str(now.second)
+                _enviro['temp1'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                _enviro['temp2'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                _enviro['temp3'] = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                _enviro['humi'] = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                _enviro['lumi'] = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                self.log("i","Temperature CH0:   "+str(_enviro['temp1']))
+                self.log("i","Temperature CH1:   "+str(_enviro['temp2']))
+                self.log("i","Temperature CH2:   "+str(_enviro['temp3']))
+                self.log("i","Relative humidity: "+str(_enviro['humi'])+"%")
+                self.log("i","Lux:               "+str(_enviro['lumi']))
+
+                enviro.append(_enviro)
+
+            #Loop increment
+            iround += 1
+
+            #Timeout break loop
+            time.sleep(10)
+            currentTime = dt.datetime.now()
+            deltaTime = (currentTime - initialTime).total_seconds()
+            breakMe = False
+            userInput = self.log("ttt","Press \"x\" to cancel standby mode or carry on in 5 seconds.")
+            if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["x"]:
+                if userInput.lower().split(" ")[0] == "x":
+                    breakMe = True
+            if breakMe:
+                self.log("i","Cancelling standby mode.")
+                waitingTime = 0
+            else:
+                self.log("i","FINISHED LOOP N."+str(iround))
+            
+        #Return z-station to bottom position before finalizing measurement
+        if ('zstation' in self.coms and isLast) or ('zstation' in self.coms and currentOverflow):
+            self.log("i","Cleaning after last measurement")
+            self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
+            motionIsDone = False
+            runTime = 0.
+            runTimeError = 21.
+            while not motionIsDone and runTime < runTimeError:
+                time.sleep(self.sleep_time['zstation']['long'])
+                returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                if len(returnValue) != 0:
+                    motionIsDone = bool(int(returnValue))
+                runTime += self.sleep_time['zstation']['long']
+            self.__detectMalfunction__(motionIsDone,"zstation")
+        else:
+            if not isLast:
+                self.log("w","Platform is still in UP position! Another measurement continues.")
+            else:
+                self.log("h","Platform is still in UP position!")
+
+        #Finalize measurement
+        if isLast:
+            self.__terminate__()
+
+        #Return to mkMeasure
+        return enviro
+ 
+    def standbyIV(self, biasPoint=0, sampleTime=0.50, nSamples=5, waitingTime=-1, isLast=True, isFirst=False):
+        #################################################
+        #As standard IV but will set bias only once. 
+        #Then program will be hanging for waitingTime.
+        #If waitingTime == -1 program will wait until 
+        #cancelled or aborted.
+        #################################################
+
+        #Define real high voltage source dev_type
+        source_dev = ''
+        source_dev_info = ""
+        if not self.args.extVSource:
+            source_dev = 'meas'
+            source_dev_info = "main measurement device"
+        else:
+            source_dev = 'source'
+            source_dev_info = "external source"
+
+        #Set remote control
+        self.__setRemote__()
+
+        #Crosscheck interlock
+        self.__checkInterlock__(safeMode=True)
+
+        #Check settings
+        if sampleTime < float(self.__par__(self.coms['meas'],"minSampleTime")):
+            self.log("w","Minimum sample time per IV measurement underflow. Setting sample time to minimum.")
+            sampleTime = float(self.__par__(self.coms['meas'],"minSampleTime"))
+        if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
+            self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
+            nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
+        biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)
+
+        #Prepare device before first measurement
+        if isFirst:
+            self.__prepMeasurement__()
+
+        #Adjusting voltage range
+        _range = "1"
+        if abs(float(biasPoint)) > 100.:
+            if int(self.__par__(self.coms[source_dev],"defBias")) <= 1000:
+                _range = str(int(self.__par__(self.coms[source_dev],"defBias")))
+            else:
+                _range = "1000"
+            self.__write__(self.__cmd__(self.coms[source_dev],"SVRANGE",arg=_range))
+        else:
+            if int(self.__par__(self.coms[source_dev],"defBias")) <= 100:
+                _range = str(int(self.__par__(self.coms[source_dev],"defBias")))
+            else:
+                _range = "100"
+            self.__write__(self.__cmd__(self.coms[source_dev],"SVRANGE",arg=_range))
+
+        #Define measurement type to IV
+        _function = str(self.__par__(self.coms['meas'],"fCurr"))
+        self.__write__(self.__cmd__(self.coms['meas'],"SENSEF", arg=_function,vital=True))
+        if self.args.verbosity > 0:
+            self.log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
+
+        #Turning OFF Zero Check if possible and Turning ON Zero Correct if possible
+        _zcheck = self.__read__(self.__cmd__(self.coms['meas'],"ZCHECK?"))
+        if _zcheck:
+            self.__write__(self.__cmd__(self.coms['meas'],"ZCHECK",arg="OFF"))
+            if self.args.verbosity > 0:
+                self.log("i","Turning OFF Zero Check.")
+        _zcor = self.__read__(self.__cmd__(self.coms['meas'],"ZCOR?"))
+        if not _zcor:
+            self.__write__(self.__cmd__(self.coms['meas'],"ZCOR",arg="ON"))
+            if self.args.verbosity > 0:
+                self.log("i","Turning ON Zero Correct.")
+        time.sleep(self.sleep_time['meas']['medium'])
+
+        #Setup buffer memory size if possible
+        self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
+
+        #Setup trigger if possible
+        if self.__read__(self.__cmd__(self.coms['meas'],"TRIGGER?")):
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=self.__par__(self.coms['meas'],"triggerType"),vital=True))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+        else:
+            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
+
+        #Turn on bias!!!
+        self.log("i","Turning ON high-voltage source for "+source_dev_info+".")
+        self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="ON",vital=True))
+
+        #Set Bias
+        self.__write__(self.__cmd__(self.coms[source_dev],"SVOLT",arg=str(biasPoint),vital=True))
+        if self.args.verbosity > 0:
+            setBias = self.__read__(self.__cmd__(self.coms[source_dev],"VOLT?"))
+            if setBias:
+                self.log("i","Voltage set: "+str(setBias)+".")
+
+        if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) == 0:
+            #Accomodating for charging time
+            self.log("i","Charging time...")
+            time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+            self.log("i","Released.")
+
+        #Adjusting current range for a measurement device
+        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
+        isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
+        if not isAuto:
+            self.log("i","IV measurement: Current AUTO range disabled.")
+            self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(float(biasPoint)))))
+            if self.args.verbosity > 0:
+                setCurrRange = self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?"))
+                if setCurrRange:
+                    self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
+        else:
+            self.log("i","IV measurement: Current AUTO range enabled.")
+ 
+        #Loop for waitingTime or until cancelled or emergency
+        initialTime = dt.datetime.now()
+        ibias = 0
+        deltaTime = 0
+        currentOverflow = False
+        results = { 'data' : [], 'enviro' : [] }
+        while waitingTime >= deltaTime or waitingTime == -1:
+            #Read out enviro data
+            enviro = {}
+            preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
+            if 'probe' in self.args.addSocket or 'probe' in self.args.addPort:
+                #dry run needed
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
+                #real run
+                preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+            enviro['temp1'] = preTemp0
+            enviro['temp2'] = preTemp1
+            enviro['temp3'] = preTemp2
+            enviro['humi']  = preHumi
+            enviro['lumi']  = preLumi
+            if self.args.verbosity > 1:
+                self.log("i","Temperature CH0 before measurement: "+str(preTemp0))
+                self.log("i","Temperature CH1 before measurement: "+str(preTemp1))
+                self.log("i","Temperature CH2 before measurement: "+str(preTemp2))
+                self.log("i","Humidity before measurement: "+str(preHumi))
+                self.log("i","Lumi before measurement: "+str(preLumi))     
+
+            #Read out measurement data
+            readout = ""
+            self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
+            self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False))                                 #Initialize trigger on source if needed
+            if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) != 0 and ibias == 0:
+                #Accomodating for charging time
+                self.log("i","Charging time...")
+                time.sleep(self.__chargingTime__(0.,float(biasPoint)))
+                self.log("i","Released.")
+            else:
+                self.log("i","Voltage is on standby.")
+            ibias += 1 
+            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
+            time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+            self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
+            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
+
+            #Process and store results
+            if len(readout) == 0:
+                self.log("w","Readout is empty!")
+                self.__terminate__()
+            else:
+                if self.args.verbosity > 1:
+                    self.log("i",str(readout))
+
+            current_readings = []
+            readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim",vital=True))
+            for iread,reading in enumerate(readout_list):
+                if self.__par__(self.coms['meas'],"readoutIdentifier",vital=True) in reading:
+                    curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
+                    current_readings.append(curr)
+                    if self.args.verbosity > 0:
+                        self.log("i","Current reading: "+str(curr))
+
+            current = 0.0
+            if len(current_readings) == nSamples:
+                current = sum(current_readings)/float(nSamples)
+            else:
+                if len(current_readings) == 0:
+                    self.log("w","BiasPoint: "+str(biasPoint)+": Parsing readout from measurement device "+str(self.coms['meas']['id'])+" failed. Change readout parameters in device-specific class.")
+                    current = "N/A"
+                    #self.__terminate__("EXIT")
+                else:
+                    current = sum(current_readings)/float(len(current_readings))
+            results['data'].append((current,biasPoint))
+            results['enviro'].append(enviro)
+
+            #Emergency break loop in case of amps exceeding maximum user set level
+            if abs(current) > abs(float(self.userCurrent))*1e-6:
+                currentOverflow = True
+                self.log("h","USER CURRENT OVERFLOW! AUTO-ABORT TRIGGERED.")
+
+                #Turn off bias immediately
+                self.__write__(self.__cmd__(self.coms[source_dev],"SVOLT",arg="0",vital=True))
+                self.__write__(self.__cmd__(self.coms[source_dev],"SOURCE",arg="OFF",vital=True))
+
+                #Actually break loop
+                break
+
+            #Timeout break loop
+            time.sleep(10)
+            currentTime = dt.datetime.now()
+            deltaTime = (currentTime - initialTime).total_seconds()
+            breakMe = False
+            userInput = self.log("ttt","Press \"x\" to cancel standby mode or carry on in 5 seconds.")
+            if len(userInput.lower().split(" ")) >=1 and userInput.lower().split(" ")[0] in ["x"]:
+                if userInput.lower().split(" ")[0] == "x":
+                    breakMe = True
+            if breakMe:
+                self.log("i","Cancelling standby mode.")
+                waitingTime = 0
+            else:
+                self.log("i","FINISHED LOOP N."+str(ibias))     
+
+        #Return z-station to bottom position before finalizing measurement
+        if ('zstation' in self.coms and isLast) or ('zstation' in self.coms and currentOverflow):
+            self.log("i","Cleaning after last measurement")
+            self.__write__(self.__cmd__(self.coms['zstation'],"SGOTO",arg=self.__par__(self.coms['zstation'],"bottomPosition"),vital=True))
+            motionIsDone = False
+            runTime = 0.
+            runTimeError = 21.
+            while not motionIsDone and runTime < runTimeError:
+                time.sleep(self.sleep_time['zstation']['long'])
+                returnValue = str(self.__read__(self.__cmd__(self.coms['zstation'],"MOVE?",vital=True)))
+                if len(returnValue) != 0:
+                    motionIsDone = bool(int(returnValue))
+                runTime += self.sleep_time['zstation']['long']
+            self.__detectMalfunction__(motionIsDone,"zstation")
+        else:
+            if not isLast:
+                self.log("w","Probe is still touching sensor! Another measurement continues.")
+            else:
+                self.log("h","Probe is still touching sensor!")
+
+        #Finalize measurement
+        if isLast or currentOverflow:
+            try:
+                self.__terminate__()
+            except OSError:
+                self.log("h","Current limit exceeded! HV source does not response! Results stored in emergency mode.")
+                self.log("h","Manual abort required.")
+
+        #Return to mkMeasure
+        if currentOverflow:
+            self.log("w","Attempted to recover results.")
+        return results     
+                  
+ 
     def finalize(self):
         ################################
         # Terminate I2C servers

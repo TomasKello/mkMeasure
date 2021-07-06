@@ -85,7 +85,7 @@ class SerialConnector:
                                 'xonxoff'  : False
                               }
         devices['probe'] = {   'id'        : "EnvServ",
-                                 'model'     : "V1.4",
+                                 'model'     : "V1.6",
                                  'type'      : "probe",
                                  'port'      : "ttyACM1",
                                  'baudrate'  : 9600,
@@ -200,7 +200,7 @@ class SerialConnector:
                 relevantDevs = [key for key in devices.keys() 
                                 if ( (key == "source" and self.args.extVSource) 
                                 or (key in self.args.addPort) 
-                                or (key == "meas" and not self.args.isEnviroOnly))]
+                                or (key == "meas" and not self.args.isEnviroOnly and not self.args.isStandByZOnly))]
                 relevantPorts = {}
                 usedPorts = []
                 #refresh used ports
@@ -266,8 +266,9 @@ class SerialConnector:
                 self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
                 self.log("i","External VSource: ID=%s, port=%s"%(selected_ports['source']['id'],selected_ports['source']['port']))
             else:
-                self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
-                self.log("i","External VSource port: not used")
+                if not self.args.isStandByZOnly:  
+                    self.log("i","Primary measurement device: ID=%s, port=%s"%(selected_ports['meas']['id'],selected_ports['meas']['port']))
+                    self.log("i","External VSource port: not used")
         for key in selected_ports.keys():
             if key not in ['meas','source']:
                 self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port'])) 
@@ -312,7 +313,8 @@ class SerialConnector:
         #setup communication
         try:
             if not self.args.isEnviroOnly:
-                COMS['meas'] = self.__set_RS232__(ports['meas'])
+                if not self.args.isStandByZOnly:
+                    COMS['meas'] = self.__set_RS232__(ports['meas'])
                 if self.args.extVSource:
                     COMS['source'] = self.__set_RS232__(ports['source'])
             for dev_type in self.args.addPort:
@@ -324,7 +326,8 @@ class SerialConnector:
     
         #initialize communication
         if not self.args.isEnviroOnly:  
-            COMS['meas']['com'] = self.__open_RS232__(COMS['meas']['com'])
+            if not self.args.isStandByZOnly:
+                COMS['meas']['com'] = self.__open_RS232__(COMS['meas']['com'])
             if self.args.extVSource:
                 COMS['source']['com'] = self.__open_RS232__(COMS['source']['com'])
         for dev_type in self.args.addPort:

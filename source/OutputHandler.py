@@ -182,7 +182,7 @@ class OutputHandler:
                               str(results['enviro'][idata]['humi']),
                               str(results['enviro'][idata]['lumi'])
                             ])
-        if "ENV" in results['type']:
+        if "ENV" in results['type'] or "standbyZ" in results['type']:
             _data.append(["TIME [h-m-s]","TEMP1 [C]","TEMP2 [C]","TEMP3 [C]","HUMI [%]","LUMI [lx]"])
             for data in results['enviro']:
                 _data.append([str(data['hour'])+"-"+str(data['minute'])+"-"+str(data['second']),

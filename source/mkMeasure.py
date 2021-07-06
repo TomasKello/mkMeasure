@@ -230,7 +230,8 @@ if __name__ == '__main__':
     measGroup.add_argument('-c','--continuous', type=range_list, dest='continuous', metavar='<bias_range>', help='Continuous IV measurement. USAGE: -c start end incr OR -c [1,2,3,4]', action='store', default=None)
     measGroup.add_argument('-e','--enviro', type=str, dest='enviro', metavar='<enviro>' , help='Enviro readings: all, temp, humi or lumi.', action='store', default=None)
     measGroup.add_argument('-g','--contenv', type=enviro_list, dest='contenv', metavar='<cont_enviro>', help='Continuous Enviro measurement. USAGE: -g <type> [<timeStep> <nSteps>]', action='store', default=None)
-    parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement. Ignore for cfg.', action='store', default=1)
+    measGroup.add_argument('-w','--standBy', nargs=1, type=float, dest='standBy', metavar='<stand_by_mode>' , help='Stanby mode with motion controller in position. Possible to measure enviro readings.', action='store', default=None)
+    parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement for R=1..N. Do nothing for R=0,-1. Repeat endlessly for R=-2. Value ignored if cfg provided.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
     parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
     parser.add_argument('--debug'      , dest='debug'         , help='Bypass several options.',                  action='store_true',            default=False )
@@ -289,7 +290,7 @@ if __name__ == '__main__':
         if not EMG:
             log("w","Results will NOT be saved.")
 
-    if args.configFile is not None and args.repeat > 1:
+    if args.configFile is not None and (args.repeat > 1 or args.repeat == -2):
         if not EMG:
             log("w","Repeat option \'-r\' ignored. Config file is specified.")
 
@@ -339,10 +340,16 @@ if __name__ == '__main__':
                                        'type'        : "contENV",
                                        'subtype'     : str(args.contenv[0]),
                                        'timeStep'    : float(args.contenv[1]),
-                                       'nSteps'      : int(args.contenv[2])  
+                                       'nSteps'      : int(args.contenv[2])
                                    }) 
+            if args.standBy is not None:
+                for ir in range(1,args.repeat+1):
+                    sequence.append({ 
+                                       'type'        : "standbyZ", 
+                                       'waitingTime' : args.standBy[0]
+                                   })
  
-        if len(sequence) == 0 and not args.testPort and not args.testMeas:
+        if len(sequence) == 0 and not args.testPort and not args.testMeas and not args.testStatus:
             log("i","No measurement tool was selected. Please select measurement inline (-s | -m | -c | -e | -g).")
             log("i","Alternatively pass configuration file using --cfg <config_file>.")
             sys.exit(0)
@@ -364,6 +371,11 @@ if __name__ == '__main__':
                 if 'timeStep' in seq and seq['timeStep'] <= 0:
                     log("e","Time step for enviro measurement must be positive number.")
                     sys.exit(0)
+            if seq['type'] == "contIV" and 'waitingTime' in seq.keys():
+                if 'bias' in seq.keys() and (len(seq['bias']) > 1 or len(seq['bias']) < 1):
+                    log("e", "Precisely one bias point is required for IV stand by mode.")
+                    sys.exit(0)   
+ 
         #---------------------------------------
         #Do not initialize all devices if only
         #enviro readings are invoked
@@ -372,6 +384,15 @@ if __name__ == '__main__':
         if len(sequence) == 1 and "ENV" in sequence[0]['type']:
             _isEnviroOnly = True
         args.isEnviroOnly = _isEnviroOnly
+
+        #----------------------------------------------
+        #Do not initialize measurement device if only
+        #standByZ mode is requested
+        #----------------------------------------------
+        _isStandByZOnly = False
+        if len(sequence) == 1 and "standbyZ" in sequence[0]['type']:
+            _isStandByZOnly = True
+        args.isStandByZOnly = _isStandByZOnly
 
         #-----------------------------------------------
         #Source can be specified also as port directly 
@@ -520,6 +541,20 @@ if __name__ == '__main__':
     if isOut:
         outputHandler = OutputHandler.OutputHandler(args)
 
+    #-------------------------
+    #All device test status
+    #-------------------------
+    if args.testStatus:
+        try:
+            status = dev.status()
+            for dev_type in status.keys():
+                log("i","Intrinsic status for "+dev_type+": "+str(status[dev_type]))
+            if len(sequence) == 0:
+                sys.exit(0)
+        except KeyboardInterrupt:
+            log("w","Keyboard interruption during status reading detected!")
+            sys.exit(0)    
+
     #-----------------------------------------------------------------
     #Provide standalone enviro measurement here if only one
     #-----------------------------------------------------------------
@@ -554,9 +589,15 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------
     try:
         if args.autoSensing:
-            biasRingConnected = dev.sense(connectTimeError=60) #connectTimeError has to be greater than 0
+            if not args.isStandByZOnly:
+                biasRingConnected = dev.sense(connectTimeError=60) #connectTimeError has to be greater than 0
+            else:
+                biasRingConnected = dev.senseExternal(connectTimeError=60)    
         else:
-            biasRingConnected = dev.sense(connectTimeError=0)
+            if not args.isStandByZOnly:
+                biasRingConnected = dev.sense(connectTimeError=0)
+            else:
+                biasRingConnected = dev.senseExternal(connectTimeError=0)  
     except KeyboardInterrupt:
         log("w","Keyboard interruption during sensing mode detected.")
         with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname): 
@@ -578,7 +619,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     #--------------------------
-    #2: SINGLE MEASUREMENT TEST
+    #3: SINGLE MEASUREMENT TEST
     #--------------------------
     if args.testMeas:
         for test_volt in [-10,10]:
@@ -611,11 +652,6 @@ if __name__ == '__main__':
                 log("w","Single test failed! High-voltage source cannot reach "+str(test_volt)+" bias.")
         log("i","Single test done. Terminating...")
         sys.exit(0)
-    
-    #-------------------------
-    #3: ALL DEVICE TEST STATUS
-    #-------------------------
-    #TODO
 
     #-------------------------
     #       MANUAL MODE
@@ -660,13 +696,22 @@ if __name__ == '__main__':
                 log("i","Bias voltage = 0 V. Doing nothing...")
         elif 'contIV' in seq['type']:
             if  'bias' in seq:
-                try:
-                    _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
-                except KeyboardInterrupt:
-                    log("w","Keyboard interruption during continuous measurement detected!")
-                    with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
-                        dev.abort()
-                        dev.terminate()
+                if 'waitingTime' in seq.keys() and int(seq['waitingTime']) != 0:
+                    try:
+                        _results = dev.standbyIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0],waitingTime=seq['waitingTime'],isLast=isLast,isFirst=isFirst)
+                    except KeyboardInterrupt:
+                        log("w","Keyboard interruption during standby continuous measurement detected!")
+                        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                            dev.abort()
+                            dev.terminate()
+                elif 'waitingTime' not in seq.keys() or ('waitingTime' in seq.keys() and int(seq['waitingTime']) == 0):
+                    try:
+                        _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
+                    except KeyboardInterrupt:
+                        log("w","Keyboard interruption during continuous measurement detected!")
+                        with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                            dev.abort()
+                            dev.terminate()
                 if len(_results['data']) > 0:
                     log("i","#"+str(iseq)+" RESULTS CONTINUOUS:")
                     log("i","-----------------")
@@ -733,6 +778,20 @@ if __name__ == '__main__':
             else:
                 log("e","Environmental measurement not defined!")
 
+        elif 'standbyZ' in seq['type']: 
+            _results = { 'type' : seq['type'], 'data' : [], 'enviro' : [] }
+            try:
+                _results['enviro'] = dev.standbyZ(waitingTime=int(seq['waitingTime']),isLast=isLast,isFirst=isFirst) 
+            except KeyboardInterrupt:
+                log("w","Keyboard interruption during standby mode detected! Results will not be saved!")
+                with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                    dev.abort()
+                    dev.terminate()
+            if len(_results['enviro']) > 0:
+                if isOut:
+                    outputHandler.load(iseq,_results)
+            
+
     #-------------------------------------
     #Finalize devices after full sequence
     #-------------------------------------
@@ -741,7 +800,8 @@ if __name__ == '__main__':
     #------------------
     #Save output localy
     #------------------
-    outputHandler.save()
+    if isOut:
+        outputHandler.save()
 
     #------------------
     #Store output in DB
