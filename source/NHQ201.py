@@ -57,6 +57,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "#", 'vital' : True },                  
                 'SCRANGE'      : { 'cmd' : "", 'vital' : False},                        #@Get SENS Current range (user)
                 'TRIGGER'   : { 'cmd' : "", 'vital' : True},                            #@Get measure event control source
                 'READOUT'   : { 'cmd' : "I1", 'vital' : True},                          #@Readout data from buffer
+                'STATUS' : { 'cmd' : "S1", 'vital' : True},                          #@Get device internal status 
 }
 
 #"Do commands" invoke device function which does not require additional parameter
@@ -94,7 +95,7 @@ pars = { 'minBias' : { 'par' : -1000, 'vital' : True, 'alt' : "minV" },         
          'inhibitorCheckable' : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Checkability of inhibitor status
          'remoteCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},        #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},        #@Checkability of voltage limits
-         'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of current limits   
+         'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Checkability of current limits   
 }
 
 
