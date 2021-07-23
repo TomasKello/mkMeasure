@@ -142,9 +142,11 @@ class Device:
         elif arg=="ON" or arg=="OFF":
             cat = "switch"
             _cmd_type = cmd_type
+            if cmd_type[-1] == "?": _cmd_type = _cmd_type[:-1]
         elif len(str(arg))!=0:
             cat = "set"
             _cmd_type = cmd_type
+            if cmd_type[-1] == "?": _cmd_type = _cmd_type[:-1]
         else:
             cat = "do"
             _cmd_type = cmd_type
@@ -563,7 +565,7 @@ class Device:
             if status in ["e","f"]:
                 self.__terminate__("EXIT")
 
-        #Setting voltage limits in addition to crosschecked voltage bias
+        #Setting source voltage limits in addition to crosschecked voltage bias
         if self.args.extVSource:
             self.__write__(self.__cmd__(self.coms['source'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
             if self.__par__(self.coms['source'],"vlimitCheckable",vital=True):
@@ -585,7 +587,7 @@ class Device:
                     self.log("i","Measurement device Source Voltage limit was specified (manufacturer) to "+str(limVDef)+".")
                     self.log("i","Measurement device Source Voltage limit was set (user) to "+str(limVSet)+".")
 
-        #Setting current limits (trip)
+        #Setting source current limits 
         if self.args.extVSource:
             self.__write__(self.__cmd__(self.coms['source'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
             if self.__par__(self.coms['source'],"climitCheckable",vital=True):
@@ -1065,10 +1067,22 @@ class Device:
         self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
 
         #Setup trigger if possible
+        triggerType = self.__par__(self.coms['meas'],"triggerType") 
         if self.__read__(self.__cmd__(self.coms['meas'],"TRIGGER?")):
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=self.__par__(self.coms['meas'],"triggerType"),vital=True))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=triggerType,vital=True))
+            if "Empty" in triggerType: #Trigger is fully programable
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))    
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, BEL, "+str()+", 100, 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True))
+            else: #minimum settings
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
             self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
        
@@ -1099,9 +1113,10 @@ class Device:
                         readout = ""
                         self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
                         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
-                        time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
-                        self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-                        readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+                        if "Empty" not in triggerType:
+                            time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+                            self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+                        readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
                         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
                         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
 
@@ -1154,9 +1169,10 @@ class Device:
                 readout = ""
                 self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
                 self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
-                time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
-                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-                readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+                if "Empty" not in triggerType:
+                    time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+                    self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+                readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
                 self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
                 self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
 
@@ -1571,11 +1587,11 @@ class Device:
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
         biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)  
 
-        #Prepare device before first measurement
+        #Prepare device before first measurement including source current/voltage limits
         if isFirst:
             self.__prepMeasurement__()
 
-        #Adjusting voltage range
+        #Adjusting source voltage range
         _range = "1"
         if abs(float(biasPoint)) > 100.:
             if int(self.__par__(self.coms[source_dev],"defBias")) <= 1000:
@@ -1604,7 +1620,10 @@ class Device:
             self.log("i","Tool: "+self.__read__(self.__cmd__(self.coms['meas'],"SENSEF?")))
 
         #Adjusting current range for measurement device
-        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
+        _autoRange = "OFF"  
+        if self.args.autoRange:
+            _autoRange = "ON" 
+        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
         isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
         if not isAuto:
             self.log("i","IV measurement: Current AUTO range disabled.")
@@ -1633,10 +1652,22 @@ class Device:
         self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
 
         #Setup trigger if possible
+        triggerType = self.__par__(self.coms['meas'],"triggerType")
         if self.__read__(self.__cmd__(self.coms['meas'],"TRIGGER?")):
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=self.__par__(self.coms['meas'],"triggerType"),vital=True))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=triggerType,vital=True))
+            if "Empty" in triggerType: #Trigger is fully programable
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, BEL, "+str()+", 100, 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True))
+            else: #minimum settings
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
             self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
 
@@ -1672,11 +1703,11 @@ class Device:
         #Read out measurement data
         readout = ""
         self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
-        self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=True))                                  #Initialize trigger on source if needed
         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
-        time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
-        self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-        readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+        if "Empty" not in triggerType:
+            time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+            self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+        readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
         self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
 
@@ -1831,12 +1862,24 @@ class Device:
         self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
 
         #Setup trigger if possible
+        triggerType = self.__par__(self.coms['meas'],"triggerType")
         if self.__read__(self.__cmd__(self.coms['meas'],"TRIGGER?")):
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=self.__par__(self.coms['meas'],"triggerType"),vital=True))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=triggerType,vital=True))
+            if "Empty" in triggerType: #Trigger is fully programable
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, BEL, "+str()+", 100, 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True))
+            else: #minimum settings
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
-            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")    
+            self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
 
         #Turn on bias!!!
         self.log("i","Turning ON high-voltage source for "+source_dev_info+".")
@@ -1862,8 +1905,11 @@ class Device:
                     time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
                 self.log("i","Released.")
 
-            #Adjusting current range for a measurement device
-            self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
+            #Adjusting current range for measurement device
+            _autoRange = "OFF"
+            if self.args.autoRange:
+                _autoRange = "ON"
+            self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
             isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
             if not isAuto:
                 self.log("i","IV measurement: Current AUTO range disabled.")
@@ -1873,7 +1919,7 @@ class Device:
                     if setCurrRange:
                         self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
             else:
-                self.log("i","IV measurement: Current AUTO range enabled.")  
+                self.log("i","IV measurement: Current AUTO range enabled.")
 
             #Read out enviro data
             enviro = {}
@@ -1917,9 +1963,10 @@ class Device:
                     time.sleep(self.__chargingTime__(float(biasRange[ibias-1]),float(biasPoint)))
                 self.log("i","Released.")             
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
-            time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
-            self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+            if "Empty" not in triggerType:
+                time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
         
@@ -2233,10 +2280,22 @@ class Device:
         self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
 
         #Setup trigger if possible
+        triggerType = self.__par__(self.coms['meas'],"triggerType")
         if self.__read__(self.__cmd__(self.coms['meas'],"TRIGGER?")):
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=self.__par__(self.coms['meas'],"triggerType"),vital=True))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
-            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+            self.__write__(self.__cmd__(self.coms['meas'],"STRIGGER",arg=triggerType,vital=True))
+            if "Empty" in triggerType: #Trigger is fully programable
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, BEL, "+str()+", 100, 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True))
+            else: #minimum settings
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="0"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
         else:
             self.log("e","Trigger is not supported by this measurement device (or commands are not specified).")
 
@@ -2257,8 +2316,11 @@ class Device:
             time.sleep(self.__chargingTime__(0.,float(biasPoint)))
             self.log("i","Released.")
 
-        #Adjusting current range for a measurement device
-        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg="OFF"))
+        #Adjusting current range for measurement device
+        _autoRange = "OFF"
+        if self.args.autoRange:
+            _autoRange = "ON"
+        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
         isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
         if not isAuto:
             self.log("i","IV measurement: Current AUTO range disabled.")
@@ -2269,7 +2331,7 @@ class Device:
                     self.log("i","IV measurement: Current range set by user to: "+str(setCurrRange)+".")
         else:
             self.log("i","IV measurement: Current AUTO range enabled.")
- 
+
         #Loop for waitingTime or until cancelled or emergency
         initialTime = dt.datetime.now()
         ibias = 0
@@ -2316,15 +2378,16 @@ class Device:
                 time.sleep(self.__chargingTime__(0.,float(biasPoint)))
                 self.log("i","Released.")
             else:
-                self.log("i","Voltage is on standby.")
-            ibias += 1 
+                self.log("i","Voltage is on standby.")  
+            ibias += 1
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
-            time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
-            self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?",vital=True))                                         #Read data from full buffer
+            if "Empty" not in triggerType:
+                time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
+                self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
+            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
-
+ 
             #Process and store results
             if len(readout) == 0:
                 self.log("w","Readout is empty!")

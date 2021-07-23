@@ -209,6 +209,7 @@ if __name__ == '__main__':
     parser.add_argument('--addSocket'       , dest='addSocket', type=dev_list, help='Enable additional port to be used as Client.',       action='store',                 default=[] )
     parser.add_argument('--expOhm', nargs=1, type=float, dest='expOhm', metavar='expected_resistance', help='Expected resistance order.', action='store',               default=[1e9])
     parser.add_argument('--autoSensing'      , dest='autoSensing'         , help='Enable automatic current sensing when placing probe.',  action='store_true',            default=False )
+    parser.add_argument('--autoRange'        , dest='autoRange'           , help='Enable automatic autorange for measured function.',     action='store_true',            default=False )
 
     #add output options
     parser.add_argument('-v', '--verbosity', action="count", help="Increase output verbosity", default=0)
@@ -268,6 +269,7 @@ if __name__ == '__main__':
         args.testMeas   = False
         args.testStatus = False
         args.isEnviroOnly = False
+        args.isStandByZOnly = False
     else:
         #Create used-config mirror in case of EMG
         mirror = open(exeDir+"/mirror.py", "w")
