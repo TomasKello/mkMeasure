@@ -1,13 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-
 block_cipher = None
 
 
 a = Analysis(['mkMeasure.py'],
              pathex=['/home/pi/mkMeasure/source'],
              binaries=[('SensBoxEnvSer','.')],
-             datas=[],
-             hiddenimports=['KEITHLEY','ESP100','NHQ201','EnvServ'],
+             datas=[('/home/kello/.local/lib/python3.6/site-packages/pyvisa_py','pyvisa_py')],
+             hiddenimports=['KEITHLEY','NEWKEITHLEY','ESP100','NHQ201','EnvServ','pyvisa_py'],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],

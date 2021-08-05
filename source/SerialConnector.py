@@ -2,6 +2,7 @@
 
 import os, sys
 import serial
+import pyvisa
 import glob
 import ColorLogger
 
@@ -28,7 +29,9 @@ class SerialConnector:
             raise EnvironmentError('Unsupported platform')
         elif sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
             # this excludes your current terminal "/dev/tty" #FIXME
-            ports = glob.glob('/dev/tty[A-Za-z]*')
+            portsSerial = glob.glob('/dev/tty[A-Za-z]*')
+            portsUSBTMC = glob.glob('/dev/usbtmc*')
+            ports = portsSerial+portsUSBTMC
         elif sys.platform.startswith('darwin'):
             #ports = glob.glob('/dev/tty.*') #FIXME
             raise EnvironmentError('Unsupported platform')
@@ -37,12 +40,20 @@ class SerialConnector:
 
         working_ports = []
         for port in ports:
-            try:
-                s = serial.Serial(port)
-                s.close()
-                working_ports.append(port)
-            except (OSError, serial.SerialException):
-                pass
+            if "usbtmc" in port:
+                    rm  = pyvisa.ResourceManager('@py')
+                    rss = rm.list_resources()
+                    for res in rss:
+                        if "USB" in res and res not in working_ports:
+                            working_ports.append(res)
+                            break
+            else:            
+                try:
+                    s = serial.Serial(port)
+                    s.close()
+                    working_ports.append(port)
+                except (OSError, serial.SerialException):
+                    pass
         return working_ports
 
     def __detect_devices__(self):
@@ -51,6 +62,20 @@ class SerialConnector:
         ###########################################################
         #FIXME this is hardcoded, should be read from config
         devices = {}
+         
+        devices['meas']   = { 'id'       : "NEWKEITHLEY",
+                              'model'    : "2470", 
+                              'type'     : "meas",   
+                              'port'     : "USB0", 
+                              'baudrate' : 9600, 
+                              'parity'   : serial.PARITY_NONE, 
+                              'stopbits' : serial.STOPBITS_TWO, 
+                              'bytesize' : serial.EIGHTBITS, 
+                              'rtscts'   : 0,
+                              'xonxoff'  : True,
+                              'visa'     : True 
+                            } 
+        '''
         devices['meas']   = { 'id'       : "KEITHLEY",
                               'model'    : "6517A", 
                               'type'     : "meas",   
@@ -60,8 +85,10 @@ class SerialConnector:
                               'stopbits' : serial.STOPBITS_TWO, 
                               'bytesize' : serial.EIGHTBITS, 
                               'rtscts'   : 0,
-                              'xonxoff'  : True
+                              'xonxoff'  : True,
+                              'visa'     : False 
                             }
+        '''                     
         devices['source'] = { 'id'       : "NHQ201",
                               'model'    : "481055-1.34", 
                               'type'     : "source", 
@@ -71,7 +98,8 @@ class SerialConnector:
                               'stopbits' : serial.STOPBITS_ONE,
                               'bytesize' : serial.EIGHTBITS,
                               'rtscts'   : 0,
-                              'xonxoff'  : True
+                              'xonxoff'  : True,
+                              'visa'     : False 
                             }
         devices['zstation'] = { 'id'       : "ESP100", 
                                 'model'    : "M-UZM80CC.1",
@@ -82,7 +110,8 @@ class SerialConnector:
                                 'stopbits' : serial.STOPBITS_ONE,
                                 'bytesize' : serial.EIGHTBITS,
                                 'rtscts'   : 1,
-                                'xonxoff'  : False
+                                'xonxoff'  : False,
+                                'visa'     : False
                               }
         devices['probe'] = {   'id'        : "EnvServ",
                                  'model'     : "V1.6",
@@ -93,7 +122,8 @@ class SerialConnector:
                                  'stopbits'  : serial.STOPBITS_TWO,
                                  'bytesize'  : serial.EIGHTBITS,
                                  'rtscts'    : 0,
-                                 'xonxoff'   : True
+                                 'xonxoff'   : True,
+                                 'visa'      : False 
         } 
         #devices['other'] = { 'id' : ""           , 'type' : "other",  'port' : ""     }
         return devices
@@ -278,29 +308,36 @@ class SerialConnector:
         #######################
         #Setup RS232 connection
         #######################
-        this_com = serial.Serial(
-                  port=this_port['port'],
-                  timeout=1,
-                  baudrate=this_port['baudrate'],
-                  parity=this_port['parity'],
-                  stopbits=this_port['stopbits'],
-                  bytesize=this_port['bytesize'],
-                  xonxoff=this_port['xonxoff'],
-                  rtscts=this_port['rtscts'],
-                  dsrdtr=False
-              )
+        if this_port['visa']:
+            rm = pyvisa.ResourceManager('@py')
+            this_com = rm.open_resource(this_port['port']) 
+        else:    
+            this_com = serial.Serial(
+                      port=this_port['port'],
+                      timeout=1,
+                      baudrate=this_port['baudrate'],
+                      parity=this_port['parity'],
+                      stopbits=this_port['stopbits'],
+                      bytesize=this_port['bytesize'],
+                      xonxoff=this_port['xonxoff'],
+                      rtscts=this_port['rtscts'],
+                      dsrdtr=False
+                  )
         COM = { 'id' : this_port['id'], 'model' : this_port['model'], 'port' : this_port['port'], 'com' : this_com }
         return COM
 
     def __open_RS232__(self,COM):
         while(True):
-            try:
-                COM.isOpen()
+            if isinstance(COM,pyvisa.resources.Resource):
                 return COM
-            except serial.SerialException as e:
-                self.log("e","Cannot open serial port!! "+str(e))
-                sys.exit(0)
-                #COM = set_RS232_interactive(COM) TODO: in case of wrong settings
+            else:    
+                try:
+                    COM.isOpen()
+                    return COM
+                except serial.SerialException as e:
+                    self.log("e","Cannot open serial port!! "+str(e))
+                    sys.exit(0)
+                    #COM = set_RS232_interactive(COM) TODO: in case of wrong settings
 
     def connect_RS232(self, failedAttempts = {}, goodAttempts = {}):
         #####################################################################

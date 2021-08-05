@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import serial
+import pyvisa
 import glob
 import time
 import datetime
@@ -234,7 +235,7 @@ if __name__ == '__main__':
     measGroup.add_argument('-w','--standBy', nargs=1, type=float, dest='standBy', metavar='<stand_by_mode>' , help='Stanby mode with motion controller in position. Possible to measure enviro readings.', action='store', default=None)
     parser.add_argument('-r','--repeat', type=int, dest='repeat', metavar='<repeat>', help='Repeat selected measurement for R=1..N. Do nothing for R=0,-1. Repeat endlessly for R=-2. Value ignored if cfg provided.', action='store', default=1)
     parser.add_argument('--sampleTime', type=arg_list, dest='sampleTime', metavar='<sample_time>', help='Sample time for each range point.', action='store', default=[0.50])
-    parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[5])
+    parser.add_argument('--nSamples', type=arg_list, dest='nSamples', metavar='<n_samples>', help='Number of samples for each range point.', action='store', default=[10])
     parser.add_argument('--debug'      , dest='debug'         , help='Bypass several options.',                  action='store_true',            default=False )
 
     #add immediate one-go functions

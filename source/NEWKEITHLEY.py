@@ -16,7 +16,7 @@ cmds = {}
 
 #"Set commands" are usually followed by argument which can be defined here (if global) or in Device class (if user-given)
 cmds['set'] = { 'STIME'    : { 'cmd' : "SYST:TIME ", 'vital' : False},                 #@Set current system date & time
-                'STIME'    : { 'cmd' : "", 'vital' : False},                           #@Set current system date & time
+                #'SDATE'    : { 'cmd' : "", 'vital' : False},                           #@Set current system date & time
                 'SVOLT'    : { 'cmd' : "SOUR:VOLT ", 'vital' : True},                  #@Set high voltage source to <arg> value
                 'SVOLTLIM' : { 'cmd' : "SOUR:CURR:VLIM ", 'vital' : True},             #@Set source voltage limit in abs value
                 'SCURRLIM' : { 'cmd' : "SOUR:VOLT:ILIM ", 'vital' : True},             #@Set source current limit in abs value
@@ -92,9 +92,9 @@ cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                  
                'POSETUP' : { 'cmd' : "SYST:POS RST", 'vital' : False},              #@Set Power On default settings (settings after power up) to settings defined by *RST
                'ZCOR'    : { 'cmd' : "SENS:AZER:ONCE", 'vital' : False},            #@Execute ZeroCorrect once
                'CLRBUFF' : { 'cmd' : "TRAC:CLE;*WAI", 'vital' : True},              #@Clear buffer and wait for this action
-               'TRIGGERINIT'  : { 'cmd' : "INIT;*WAI", 'vital' : False},            #@Initialize trigger operations and wait until all is done
+               'TRIGGERINIT'  : { 'cmd' : "INIT;*WAI", 'vital' : True},             #@Initialize trigger operations and wait until all is done
                'TRIGGERABORT' : { 'cmd' : "ABORT", 'vital' : False},                #@Abort operations and send trigger to idle
-               'REMOTE'  : { 'cmd' : "login", 'vital' : True},                      #@Set device to remote control and disable front panel
+               'REMOTE'  : { 'cmd' : "login", 'vital' : False},                     #@Set device to remote control and disable front panel 
                'LOCAL'   : { 'cmd' : "logout", 'vital' : True},                     #@Set device to local control and enable front panel 
 }
 
@@ -104,7 +104,7 @@ cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                  
 
 pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },              #@Extreme minimum voltage to be set on this device (user). Can be set up to -defBias.
          'maxBias' : { 'par' :  900, 'vital' : True, 'alt' : "maxV" },              #@Extreme maximum voltage to be set on this device (user). Can be set up to defBias.
-         'maxCurrent' : { 'par' :  3e-05, 'vital' : True, 'alt' : "maxC" },         #@Extreme maximum output current [A] to be set on this device (user). Can be set up to defCurrent.
+         'maxCurrent' : { 'par' :  30e-6, 'vital' : True, 'alt' : "maxC" },            #@Extreme maximum output current [A] to be set on this device (user). Can be set up to defCurrent.
          'userCurrent' : { 'par' : 30, 'vital' : False, 'alt' : "userC" },          #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
          'defBias' : { 'par' : 1100, 'vital' : True, 'alt' : "defaultMaxV"},        #@Factory settings total (absolute) maximum of voltage to be set on this device (manufacturer)
          'defCurrent' : { 'par' : 1.05e-4, 'vital' : True, 'alt' : "defaultMaxC"},  #@Factory settings total maximum of current [A] to be set on this device (manufacturer) 
@@ -122,7 +122,7 @@ pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },          
          'decimalVolt'       : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Check if decimal accuracy for setting volts is allowed
          'interlockCheckable' : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of interlock status
          'inhibitorCheckable' : { 'par' : False,'vital' : True, 'alt' : ""},        #@Checkability of inhibitor status
-         'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of remote control
+         'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of voltage limits
          'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of current limits
 }
@@ -168,8 +168,8 @@ class NEWKEITHLEY():
                     if cat == "switch":
                         for child in cmds[cat][cmd_type]['children'][str(arg)]:
                             if ":" in child:
-                                _childType = child.split[":"][0] 
-                                _childKey  = child.split[":"][-1]
+                                _childType = child.split(":")[0] 
+                                _childKey  = child.split(":")[-1]
                             else: 
                                 _childType = cat
                                 _childKey  = child
@@ -188,8 +188,8 @@ class NEWKEITHLEY():
                     else:
                         for child in cmds[cat][cmd_type]['children']:
                             if ":" in child:
-                                _childType = child.split[":"][0]
-                                _childKey  = child.split[":"][-1]
+                                _childType = child.split(":")[0]
+                                _childKey  = child.split(":")[-1]
                             else:
                                 _childType = cat
                                 _childKey  = child
@@ -207,7 +207,10 @@ class NEWKEITHLEY():
                                 return (cmd,[],[])
                     cmd = _cmd.strip(";")         
                 else:
-                    cmd = cmds[cat][cmd_type]['cmd']+str(arg)
+                    if len(cmds[cat][cmd_type]['cmd']) == 0:
+                        cmd = ""
+                    else:    
+                        cmd = cmds[cat][cmd_type]['cmd']+str(arg)
                 if 'isOK' in cmds[cat][cmd_type].keys():
                     isOK = cmds[cat][cmd_type]['isOK']
                 if 'isNOT' in cmds[cat][cmd_type].keys():
@@ -242,25 +245,135 @@ class NEWKEITHLEY():
 
         return _par    
 
-    def write(self,com,cmd):
+    def write(self,com,raw_cmd):
         ############################################
         #Define device-specific 'write' routine here
         ############################################
         time.sleep(self.sleep_time)
-        write_status = com.write((cmd+self.delim).encode())
+        raw_cmds = raw_cmd.split(";")
+        queries = []
+        args = []
+        arg_types = []
+        for _cmd in raw_cmds:
+            if len(_cmd.split(" ")) > 1:
+                queries.append(_cmd.split(" ")[0])
+                raw_args = (_cmd.replace(_cmd.split(" ")[0],"")).split(",")
+                _args = []
+                _arg_types = []
+                for arg in raw_args:
+                    _arg = ""
+                    try:
+                        _arg = int(arg)
+                        _arg_types.append("int")
+                    except ValueError:
+                        try:
+                            _arg = float(arg)
+                            _arg_types.append("float")
+                        except ValueError:
+                            _arg = str(arg)
+                            _arg_types.append("str")
+                    _args.append(_arg)
+                args.append(_args)
+                arg_types.append(_arg_types)
+            else:
+                queries.append(_cmd)
+                args.append([])
+                arg_types.append([])       
+
+        _response = ""
+        for iq,query in enumerate(queries):
+            try:
+                if not query.endswith("?"):
+                    #set/switch/do commands 
+                    isNum = True
+                    if not query.endswith(" "): query+=" "
+                    for argType in arg_types[iq]:
+                        if argType != "int" and argType != "float":
+                            isNum = False
+                    if len(args[iq]) != 0 and isNum:
+                        if len(args[iq])==1:
+                            if(str(args[iq][0]).startswith(" ")): args[iq][0] = str(args[iq][0])[1:]
+                            #print(query+".NUM")
+                            #print(str(args[iq][0]))
+                            com.write(query+str(args[iq][0]))
+                        else:
+                            #print(query+".")
+                            #print(args[iq])
+                            com.write_ascii_values(query,args[iq])
+                    else:
+                        if len(args[iq])==1:
+                            if(str(args[iq][0]).startswith(" ")): args[iq][0] = str(args[iq][0])[1:]
+                            #print(query+".STR")
+                            #print(args[iq][0])
+                            com.write(query,args[iq][0])
+                        else:
+                            if "log" in query:
+                                _response += com.query(query).rstrip()+";"
+                            elif "LIM:CONS" in query:
+                                str_args = [str(arg) for arg in args[iq]]
+                                one_arg = ", ".join(str_args).strip(", ")
+                                #print(query)
+                                #print(one_arg)
+                                com.write(query,one_arg)
+                            else:
+                                #print(query)
+                                #print(args[iq])
+                                com.write(query,args[iq])
+                    _response += "RECEIVED;"
+            except Exception as e:
+                _response += str(e)+";" 
+
+        write_status = _response.strip(";")
         return write_status
 
-    def read(self,com,cmd):
+    def read(self,com,raw_cmd):
         ###########################################
         #Define device-specific 'read' routine here
         ###########################################
         time.sleep(self.sleep_time)
-        com.write((cmd+self.delim).encode())
-        time.sleep(self.medium_sleep_time)
-        read_value = ""
-        while com.inWaiting() > 0:
-            part = com.read(1).decode().strip('\r')
-            read_value += part
+        raw_cmds = raw_cmd.split(";")
+        queries = []
+        args = []
+        arg_types = []
+        for _cmd in raw_cmds:
+            if len(_cmd.split(" ")) > 1:
+                queries.append(_cmd.split(" ")[0])
+                raw_args = (_cmd.replace(_cmd.split(" ")[0],"")).split(",") 
+                _args = []
+                _arg_types = []
+                for arg in raw_args:
+                    _arg = ""
+                    try:
+                        _arg = int(arg)
+                        _arg_types.append("int")
+                    except ValueError:
+                        try:
+                            _arg = float(arg)
+                            _arg_types.append("float")
+                        except ValueError:
+                            _arg = str(arg)
+                            _arg_types.append("str")
+                    _args.append(_arg)        
+                args.append(_args)
+                arg_types.append(_arg_types)
+            else:
+                queries.append(_cmd)
+                args.append([])
+                arg_types.append([])
+
+        _response = ""
+        for iq,query in enumerate(queries):
+            try:
+                if (query.endswith("?") and len(args[iq]) == 0) or "log" in query:
+                    #query without extra specifier
+                    _response += com.query(query).rstrip()+";"
+                elif query.endswith("?") and len(args[iq]) != 0:
+                    #query with exta specifier
+                    _response += com.query(query+" "+", ".join([str(arg) for arg in args[iq]])).rstrip()+";"
+            except Exception as e:
+                _response += str(e)+";"    
+                
+        read_value = _response.strip(";")   
         return read_value.rstrip()
 
     def pre(self,com):
