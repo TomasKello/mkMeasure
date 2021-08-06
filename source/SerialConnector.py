@@ -31,6 +31,19 @@ class SerialConnector:
             # this excludes your current terminal "/dev/tty" #FIXME
             portsSerial = glob.glob('/dev/tty[A-Za-z]*')
             portsUSBTMC = glob.glob('/dev/usbtmc*')
+            if len(portsUSBTMC) == 0:
+                rm  = pyvisa.ResourceManager('@py')
+                rss = rm.list_resources()
+                for resource in rss:
+                    if "USB" in resource and "tty" not in resource:
+                        num = 0
+                        try:
+                            num = int(resource[3])
+                            portsUSBTMC.append("usbtmc"+str(num))
+                        except ValueError:
+                            pass
+                        except Exception:
+                            pass
             ports = portsSerial+portsUSBTMC
         elif sys.platform.startswith('darwin'):
             #ports = glob.glob('/dev/tty.*') #FIXME

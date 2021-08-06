@@ -572,8 +572,8 @@ if __name__ == '__main__':
                     outputHandler.load(0,_results)    
                     outputHandler.save()
             except KeyboardInterrupt:
-                log("w","Keyboard interruption during standalone enviro measurement detected!")
                 with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                    log("w","Keyboard interruption during standalone enviro measurement detected!")
                     dev.abort()
                     dev.terminate()
         elif "cont" in sequence[0]['type']:
@@ -602,8 +602,8 @@ if __name__ == '__main__':
             else:
                 biasRingConnected = dev.senseExternal(connectTimeError=0)  
     except KeyboardInterrupt:
-        log("w","Keyboard interruption during sensing mode detected.")
         with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname): 
+            log("w","Keyboard interruption during sensing mode detected.")
             dev.abort()
             dev.terminate()
     if not biasRingConnected:
@@ -615,8 +615,8 @@ if __name__ == '__main__':
     try:
         boxReady = dev.box()
     except KeyboardInterrupt:
-        log("w","Keyboard interruption during box crosscheck detected.")
         with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+            log("w","Keyboard interruption during box crosscheck detected.")
             dev.terminate()
     if not boxReady:
         sys.exit(0)
@@ -678,8 +678,8 @@ if __name__ == '__main__':
                 try:
                     current, bias, enviro = dev.singleIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
-                    log("w","Keyboard interruption during single measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                        log("w","Keyboard interruption during single measurement detected!")
                         dev.abort()
                         dev.terminate()
                 if bias != None:
@@ -703,16 +703,16 @@ if __name__ == '__main__':
                     try:
                         _results = dev.standbyIV(biasPoint=seq['bias'][0],sampleTime=seq['sampleTime'][0],nSamples=seq['nSamples'][0],waitingTime=seq['waitingTime'],isLast=isLast,isFirst=isFirst)
                     except KeyboardInterrupt:
-                        log("w","Keyboard interruption during standby continuous measurement detected!")
                         with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                            log("w","Keyboard interruption during standby continuous measurement detected!")
                             dev.abort()
                             dev.terminate()
                 elif 'waitingTime' not in seq.keys() or ('waitingTime' in seq.keys() and int(seq['waitingTime']) == 0):
                     try:
                         _results = dev.continuousIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                     except KeyboardInterrupt:
-                        log("w","Keyboard interruption during continuous measurement detected!")
                         with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                            log("w","Keyboard interruption during continuous measurement detected!")
                             dev.abort()
                             dev.terminate()
                 if len(_results['data']) > 0:
@@ -740,8 +740,8 @@ if __name__ == '__main__':
                 try:
                     _results = dev.multiIV(biasRange=seq['bias'],sampleTime=seq['sampleTime'],nSamples=seq['nSamples'],isLast=isLast,isFirst=isFirst)
                 except KeyboardInterrupt:
-                    log("w","Keyboard interruption during multi measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                        log("w","Keyboard interruption during multi measurement detected!")
                         dev.abort()
                         dev.terminate()
                 if len(_results['data']) > 0:
@@ -770,8 +770,8 @@ if __name__ == '__main__':
                 try:
                     _results['enviro'].append( dev.singleENV(str(seq['subtype'],isLast=isLast,isFirst=isFirst)) )
                 except KeyboardInterrupt:
-                    log("w","Keyboard interruption during standalone enviro measurement detected!")
                     with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                        log("w","Keyboard interruption during standalone enviro measurement detected!")
                         dev.abort()
                         dev.terminate()
                 if len(_results['enviro']) > 0:
@@ -786,8 +786,8 @@ if __name__ == '__main__':
             try:
                 _results['enviro'] = dev.standbyZ(waitingTime=int(seq['waitingTime']),isLast=isLast,isFirst=isFirst) 
             except KeyboardInterrupt:
-                log("w","Keyboard interruption during standby mode detected! Results will not be saved!")
                 with warden.DelayedKeyboardInterrupt(force=False, logfile=args.logname):
+                    log("w","Keyboard interruption during standby mode detected! Results will not be saved!") 
                     dev.abort()
                     dev.terminate()
             if len(_results['enviro']) > 0:

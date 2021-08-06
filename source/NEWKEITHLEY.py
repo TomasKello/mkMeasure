@@ -105,7 +105,7 @@ cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                  
 pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },              #@Extreme minimum voltage to be set on this device (user). Can be set up to -defBias.
          'maxBias' : { 'par' :  900, 'vital' : True, 'alt' : "maxV" },              #@Extreme maximum voltage to be set on this device (user). Can be set up to defBias.
          'maxCurrent' : { 'par' :  30e-6, 'vital' : True, 'alt' : "maxC" },            #@Extreme maximum output current [A] to be set on this device (user). Can be set up to defCurrent.
-         'userCurrent' : { 'par' : 30, 'vital' : False, 'alt' : "userC" },          #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
+         'userCurrent' : { 'par' : 29.9, 'vital' : False, 'alt' : "userC" },          #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
          'defBias' : { 'par' : 1100, 'vital' : True, 'alt' : "defaultMaxV"},        #@Factory settings total (absolute) maximum of voltage to be set on this device (manufacturer)
          'defCurrent' : { 'par' : 1.05e-4, 'vital' : True, 'alt' : "defaultMaxC"},  #@Factory settings total maximum of current [A] to be set on this device (manufacturer) 
          'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                  #@Basic sleep time in seconds needed for proper running of device routines
@@ -127,7 +127,7 @@ pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },          
          'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of current limits
 }
 
-
+##########
 
 class NEWKEITHLEY():
     def __init__(self):

@@ -1163,7 +1163,7 @@ class Device:
                                 current_readings.append(curr)
                                 if self.args.verbosity > 0:
                                     self.log("i","Current reading: "+str(curr))
-                            else: 
+                            elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0: 
                                 current_readings.append(float(reading))
                                 if self.args.verbosity > 0:
                                     self.log("i","Current reading: "+str(reading))
@@ -1226,7 +1226,7 @@ class Device:
                         current_readings.append(curr)
                         if self.args.verbosity > 0:
                             self.log("i","Current reading: "+str(curr))
-                    else:
+                    elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
                         current_readings.append(float(reading))
                         if self.args.verbosity > 0:
                             self.log("i","Current reading: "+str(reading))
@@ -1727,7 +1727,7 @@ class Device:
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
-                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, ABOV, 0, "+str(self.userCurrent)+", 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, IN, "+str(self.maxCurrent)+", 1e-2, 6"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 1.0"))
@@ -1816,7 +1816,7 @@ class Device:
                 current_readings.append(curr)
                 if self.args.verbosity > 0:
                     self.log("i","Current reading: "+str(curr))
-            else:
+            elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
                 current_readings.append(float(reading))
                 if self.args.verbosity > 0:
                     self.log("i","Current reading: "+str(reading))
@@ -1943,7 +1943,7 @@ class Device:
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
-                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, ABOV, 0, "+str(self.userCurrent)+", 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, IN, "+str(self.maxCurrent)+", 1e-2, 6"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
@@ -1980,10 +1980,10 @@ class Device:
 
             #Adjusting current range for measurement device
             _autoRange = "OFF"
-            if self.args.autoRange:
+            if self.args.autoRange and ibias == 0:
                 _autoRange = "ON"
                 #Pre-set maximum range
-                self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(1000)))) #FIXME for max bias
+                self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(500)))) #FIXME for max bias
 
                 #Pre-set desired limit
                 if self.args.extVSource:
@@ -2010,7 +2010,9 @@ class Device:
                         if limCSet:
                             self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
                             self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
-            self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
+                self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
+            elif self.args.autoRange:
+                _autoRange = "ON" 
             isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
             if not isAuto:
                 self.log("i","IV measurement: Current AUTO range disabled.")
@@ -2116,7 +2118,7 @@ class Device:
                     current_readings.append(curr)
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(curr))
-                else:
+                elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
                     current_readings.append(float(reading))
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(reading))        
@@ -2422,7 +2424,7 @@ class Device:
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
-                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, BEL, "+str()+", 100, 6"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, IN, "+str(self.maxCurrent)+", 1e-2, 6"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERDELAY",arg="7, 0.05"))
@@ -2443,6 +2445,7 @@ class Device:
             setBias = self.__read__(self.__cmd__(self.coms[source_dev],"VOLT?"))
             if setBias:
                 self.log("i","Voltage set: "+str(setBias)+".")
+        ibias = 0        
 
         if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) == 0:
             #Accomodating for charging time
@@ -2452,9 +2455,39 @@ class Device:
 
         #Adjusting current range for measurement device
         _autoRange = "OFF"
-        if self.args.autoRange:
+        if self.args.autoRange and ibias == 0:
             _autoRange = "ON"
-        self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
+            #Pre-set maximum range
+            self.__write__(self.__cmd__(self.coms['meas'],"SSCRANGE", arg=str(self.__getCurrentRange__(1000)))) #FIXME for max bias
+
+            #Pre-set desired limit
+            if self.args.extVSource:
+                self.__write__(self.__cmd__(self.coms['source'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+                if self.__par__(self.coms['source'],"climitCheckable",vital=True):
+                    current_range = float(self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?")))
+                    safe_current_limit = self.__getCurrentLimit__(current_range, float(self.maxCurrent))
+                    self.__write__(self.__cmd__(self.coms['source'],"SCURRLIM",arg=safe_current_limit,vital=True)) #Set maximum current limit
+                if self.args.verbosity > 0:
+                    limCSet = self.__read__(self.__cmd__(self.coms['source'],"CURRLIM?"))
+                    limCDef = self.__par__(self.coms['source'],"defCurrent")
+                    if limCSet:
+                        self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                        self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+            else:
+                self.__write__(self.__cmd__(self.coms['meas'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+                if self.__par__(self.coms['meas'],"climitCheckable",vital=True):
+                    current_range = float(self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?")))
+                    safe_current_limit = self.__getCurrentLimit__(current_range, float(self.maxCurrent))
+                    self.__write__(self.__cmd__(self.coms['meas'],"SCURRLIM",arg=safe_current_limit,vital=True)) #Set maximum current limit
+                if self.args.verbosity > 0:
+                    limCSet = self.__read__(self.__cmd__(self.coms['meas'],"CURRLIM?"))
+                    limCDef = self.__par__(self.coms['meas'],"defCurrent")
+                    if limCSet:
+                        self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                        self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+            self.__write__(self.__cmd__(self.coms['meas'],"SCAUTORANGE", arg=_autoRange))
+        elif self.args.autoRange:
+            _autoRange = "ON"    
         isAuto = bool(int(self.__read__(self.__cmd__(self.coms['meas'],"SCAUTORANGE?"))))
         if not isAuto:
             self.log("i","IV measurement: Current AUTO range disabled.")
@@ -2466,9 +2499,34 @@ class Device:
         else:
             self.log("i","IV measurement: Current AUTO range enabled.")
 
+        #Setting source current limits when autoRange is OFF 
+        if self.args.extVSource and not isAuto:
+            self.__write__(self.__cmd__(self.coms['source'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+            if self.__par__(self.coms['source'],"climitCheckable",vital=True):
+                current_range = float(self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?")))
+                safe_current_limit = self.__getCurrentLimit__(current_range, float(self.maxCurrent))
+                self.__write__(self.__cmd__(self.coms['source'],"SCURRLIM",arg=safe_current_limit,vital=True)) #Set maximum current limit
+            if self.args.verbosity > 0:
+                limCSet = self.__read__(self.__cmd__(self.coms['source'],"CURRLIM?"))
+                limCDef = self.__par__(self.coms['source'],"defCurrent")
+                if limCSet:
+                    self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                    self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+        elif not isAuto:
+            self.__write__(self.__cmd__(self.coms['meas'],"LIMSTAT",arg="ON")) #Enable changing limits if needed
+            if self.__par__(self.coms['meas'],"climitCheckable",vital=True):
+                current_range = float(self.__read__(self.__cmd__(self.coms['meas'],"SCRANGE?")))
+                safe_current_limit = self.__getCurrentLimit__(current_range, float(self.maxCurrent))
+                self.__write__(self.__cmd__(self.coms['meas'],"SCURRLIM",arg=safe_current_limit,vital=True)) #Set maximum current limit
+            if self.args.verbosity > 0:
+                limCSet = self.__read__(self.__cmd__(self.coms['meas'],"CURRLIM?"))
+                limCDef = self.__par__(self.coms['meas'],"defCurrent")
+                if limCSet:
+                    self.log("i","Measurement device Source Output Current limit was specified (manufacturer) to "+str(limCDef)+".")
+                    self.log("i","Measurement device Source Output Current limit was set (user) to "+str(limCSet)+".")
+
         #Loop for waitingTime or until cancelled or emergency
         initialTime = dt.datetime.now()
-        ibias = 0
         deltaTime = 0
         currentOverflow = False
         results = { 'data' : [], 'enviro' : [] }
@@ -2502,26 +2560,27 @@ class Device:
                 self.log("i","Humidity before measurement: "+str(preHumi))
                 self.log("i","Lumi before measurement: "+str(preLumi))     
 
+
             #Read out measurement data
             readout = ""
             self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))                                                   #Clear buffer
-            self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False))                                 #Initialize trigger on source if needed
-            if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=False)['cmd']) != 0 and ibias == 0:
+            if source_dev != "meas":
+                self.__write__(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=True))                              #Initialize trigger on source if needed
+            if len(self.__cmd__(self.coms[source_dev],"TRIGGERINIT",arg="ON",vital=True)['cmd']) != 0 and ibias == 0:
                 #Accomodating for charging time
                 self.log("i","Charging time...")
                 time.sleep(self.__chargingTime__(0.,float(biasPoint)))
                 self.log("i","Released.")
-            else:
-                self.log("i","Voltage is on standby.")  
-            ibias += 1
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="ON",vital=True))                                      #Initialize trigger on measurement device if needed
+            _vitalTriggerOFF = False
             if "Empty" not in triggerType:
                 time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
                 self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
-            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples), vital=True))               #Read data from full buffer
-            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=True))                                     #Stop trigger
+                _vitalTriggerOFF = True
+            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples)+", \"defbuffer1\", READ", vital=True))  #Read data from full buffer
+            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=False))                                    #Stop trigger (not needed)
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
- 
+
             #Process and store results
             if len(readout) == 0:
                 self.log("w","Readout is empty!")
@@ -2531,13 +2590,17 @@ class Device:
                     self.log("i",str(readout))
 
             current_readings = []
-            readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim",vital=True))
+            readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim"))
             for iread,reading in enumerate(readout_list):
-                if self.__par__(self.coms['meas'],"readoutIdentifier",vital=True) in reading:
-                    curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier",vital=True),''))
+                if self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier")) != 0:
+                    curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier"),''))
                     current_readings.append(curr)
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(curr))
+                elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
+                    current_readings.append(float(reading))
+                    if self.args.verbosity > 0:
+                        self.log("i","Current reading: "+str(reading))
 
             current = 0.0
             if len(current_readings) == nSamples:
