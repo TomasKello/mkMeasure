@@ -12,10 +12,16 @@ class DelayedKeyboardInterrupt(object):
     ######################################
     def __init__(self,force=True,logfile="delayed.txt"):
         self.force = force
-        self.clogger = ColorLogger.ColorLogger("KeyboardWarden:  ",logfile)
+        self.keepLog = True
+        try: 
+            self.clogger = ColorLogger.ColorLogger("KeyboardWarden:  ",logfile)
+        except KeyboardInterrupt:
+            self.keepLog = False
 
     def log(self,log_type="i",text=""):
-        return self.clogger.log(log_type,text)
+        if self.keepLog:
+            return self.clogger.log(log_type,text)
+        return 0
 
     def __enter__(self):
         self.signal_received = False

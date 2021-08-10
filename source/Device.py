@@ -1626,6 +1626,9 @@ class Device:
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
             self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
+        if nSamples < int(self.__par__(self.coms['meas'],"minNSamples")):
+            self.log("w","Minimum number of samples per IV measurement not reached. Setting number of samples to minimum.")
+            nSamples = int(self.__par__(self.coms['meas'],"minNSamples"))
         biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)  
 
         #Prepare device before first measurement including source current/voltage limits
@@ -1890,6 +1893,9 @@ class Device:
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
             self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
+        if nSamples < int(self.__par__(self.coms['meas'],"minNSamples")):
+            self.log("w","Minimum number of samples per IV measurement not reached. Setting number of samples to minimum.")
+            nSamples = int(self.__par__(self.coms['meas'],"minNSamples"))
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
         #Prepare device before first measurement
@@ -2211,6 +2217,9 @@ class Device:
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
             self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
+        if nSamples < int(self.__par__(self.coms['meas'],"minNSamples")):
+            self.log("w","Minimum number of samples per IV measurement not reached. Setting number of samples to minimum.")
+            nSamples = int(self.__par__(self.coms['meas'],"minNSamples"))
         biasRange = self.__checkBiasRange__(self.coms[source_dev],biasRange)
 
         #Loop over bias points
@@ -2372,6 +2381,9 @@ class Device:
         if nSamples > int(self.__par__(self.coms['meas'],"maxNSamples")):
             self.log("w","Maximum number of samples per IV measurement exceeded. Setting number of samples to maximum.")
             nSamples = int(self.__par__(self.coms['meas'],"maxNSamples"))
+        if nSamples < int(self.__par__(self.coms['meas'],"minNSamples")):
+            self.log("w","Minimum number of samples per IV measurement not reached. Setting number of samples to minimum.")
+            nSamples = int(self.__par__(self.coms['meas'],"minNSamples"))
         biasPoint = self.__checkBias__(self.coms[source_dev],biasPoint)
 
         #Prepare device before first measurement

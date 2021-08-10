@@ -84,6 +84,7 @@ pars = { 'minBias' : { 'par' : -100, 'vital' : True, 'alt' : "minV" },          
          'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                  #@Long sleep time
          'minSampleTime' : { 'par' : 0.50, 'vital' : False, 'alt' : "minSTime"},    #@Minimum sample time for a single IV measurement
          'maxNSamples'   : { 'par' : 8,    'vital' : False, 'alt' : "" },           #@Maximum number of samples per single IV measurement
+         'minNSamples'   : { 'par' : 1,    'vital' : False, 'alt' : "" },           #@Minimum number of samples per single IV measurement
          'fCurr'         : { 'par' : '\'CURR\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining CurrentMeasurement function 
          'fVolt'         : { 'par' : '\'VOLT\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining VoltageMeasurement function
          'triggerType'   : { 'par' : 'IMM', 'vital' : True, 'alt' : ""},            #@Trigger source, supported type is IMMEDIATE (pass first layer immediately)

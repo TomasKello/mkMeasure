@@ -50,14 +50,14 @@ class SerialConnector:
             raise EnvironmentError('Unsupported platform')
         else:
             raise EnvironmentError('Unsupported platform')
-
+        
         working_ports = []
         for port in ports:
             if "usbtmc" in port:
                     rm  = pyvisa.ResourceManager('@py')
                     rss = rm.list_resources()
                     for res in rss:
-                        if "USB" in res and res not in working_ports:
+                        if "USB" in res and "ASRL" not in res and res not in working_ports:
                             working_ports.append(res)
                             break
             else:            
@@ -67,6 +67,7 @@ class SerialConnector:
                     working_ports.append(port)
                 except (OSError, serial.SerialException):
                     pass
+        print(working_ports)
         return working_ports
 
     def __detect_devices__(self):
@@ -259,7 +260,9 @@ class SerialConnector:
                         relevantPorts[relDev] = [goodAttempts[relDev]] #precisely one
                     else:    
                         relevantPorts[relDev] = [port for port in COM_ports 
-                                                 if (("USB" in port or "ttyS" in port or "ACM" in port) 
+                                                 if ((    ("USB" in port and "dev" in port and not devices[relDev]['visa']) 
+                                                       or ("USB" in port and not "dev" in port and devices[relDev]['visa']) 
+                                                       or "ttyS" in port or "ACM" in port) 
                                                      and ( (relDev in failedAttempts.keys() and port not in failedAttempts[relDev]) or 
                                                            relDev not in failedAttempts.keys()
                                                          )
@@ -273,7 +276,8 @@ class SerialConnector:
                             relevantPorts[relDev] = [port for port in COM_ports
                                                      if (("USB" in port or "ttyS" in port or "ACM" in port) and port not in usedPorts)
                                                     ]
-
+                    print(relDev+":")
+                    print(relevantPorts[relDev])  
                     isDefault = False
                     for port in relevantPorts[relDev]:
                         #print("reldev="+relDev+" port="+port)
@@ -314,7 +318,8 @@ class SerialConnector:
                     self.log("i","External VSource port: not used")
         for key in selected_ports.keys():
             if key not in ['meas','source']:
-                self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port'])) 
+                self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port']))
+        print(selected_ports) 
         return selected_ports
 
     def __set_RS232__(self,this_port):
@@ -323,6 +328,8 @@ class SerialConnector:
         #######################
         if this_port['visa']:
             rm = pyvisa.ResourceManager('@py')
+            rss = rm.list_resources()
+            print(rss)
             this_com = rm.open_resource(this_port['port']) 
         else:    
             this_com = serial.Serial(
@@ -352,7 +359,7 @@ class SerialConnector:
                     sys.exit(0)
                     #COM = set_RS232_interactive(COM) TODO: in case of wrong settings
 
-    def connect_RS232(self, failedAttempts = {}, goodAttempts = {}):
+    def connect_RS232(self, failedAttempts = {}, goodAttempts = {}, goodCOMS = {}):
         #####################################################################
         #Global function called from mkMeasure to setup RS232 safe connection 
         #with configured devices
@@ -364,11 +371,20 @@ class SerialConnector:
         try:
             if not self.args.isEnviroOnly:
                 if not self.args.isStandByZOnly:
-                    COMS['meas'] = self.__set_RS232__(ports['meas'])
+                    if 'meas' not in goodAttempts.keys():   
+                        COMS['meas'] = self.__set_RS232__(ports['meas'])
+                    else:
+                        COMS['meas'] = goodCOMS['meas']
                 if self.args.extVSource:
-                    COMS['source'] = self.__set_RS232__(ports['source'])
+                    if 'source' not in goodAttempts.keys(): 
+                        COMS['source'] = self.__set_RS232__(ports['source'])
+                    else:
+                        COMS['source'] = goodCOMS['source']
             for dev_type in self.args.addPort:
-                COMS[dev_type] = self.__set_RS232__(ports[dev_type])
+                if dev_type not in goodAttempts.keys():
+                    COMS[dev_type] = self.__set_RS232__(ports[dev_type])
+                else:
+                    COMS[dev_type] = goodCOMS[dev_type] 
         except KeyError as e:
             self.log("f","Port selection failed during bit exchange. Repeat selection.")
             self.log("f","Missing key: "+str(e)) 

@@ -468,8 +468,9 @@ if __name__ == '__main__':
         SOCKETS = connectorSocket.gateway()
         failedAttempts = {}
         goodAttempts = {}
+        goodCOMS = {}
         while not allMatched:
-            COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts)
+            COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts,goodCOMS)
             log("i","Use CTRL+C to cancel automatic selecion.")
 
             #Keyboard exception is controlled internally
@@ -487,6 +488,7 @@ if __name__ == '__main__':
                             failedAttempts[key].append(_port)
                     elif valid == 1:
                             goodAttempts[key] = _port
+                            goodCOMS[key] = COMS[key]
 
     elif doRetry and args.isEnviroOnly:
         #ignore other devices as meas or source 
@@ -505,8 +507,9 @@ if __name__ == '__main__':
             allMatched = False
             failedAttempts = {}
             goodAttempts = {}
+            goodCOMS = {} 
             while not allMatched:
-                _COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts)
+                _COMS = connectorSerial.connect_RS232(failedAttempts,goodAttempts,goodCOMS)
                 for dev_type in args.addPort:
                     COMS[dev_type] = _COMS[dev_type]
                 log("i","Use CTRL+C to cancel automatic selecion.")
@@ -526,6 +529,7 @@ if __name__ == '__main__':
                                 failedAttempts[key].append(_port)
                         elif valid == 1:
                                 goodAttempts[key] = _port
+                                goodCOMS[key] = _COMS[key] 
 
     #-----------------------------------------------------------------
     #Raise argument invoked emergency functions here

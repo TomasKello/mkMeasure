@@ -113,6 +113,7 @@ pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },          
          'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                  #@Long sleep time
          'minSampleTime' : { 'par' : 0.50, 'vital' : False, 'alt' : "minSTime"},    #@Minimum sample time for a single IV measurement
          'maxNSamples'   : { 'par' : 100,    'vital' : False, 'alt' : "" },         #@Maximum number of samples per single IV measurement
+         'minNSamples'   : { 'par' : 10,    'vital' : False, 'alt' : "" },         #@Minimum number of samples per single IV measurement
          'fCurr'         : { 'par' : '\'CURR\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining CurrentMeasurement function 
          'fVolt'         : { 'par' : '\'VOLT\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining VoltageMeasurement function
          'triggerType'   : { 'par' : '\"Empty\"', 'vital' : True, 'alt' : ""},      #@Trigger source, build trigger from scratch
