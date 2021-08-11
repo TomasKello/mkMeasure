@@ -71,6 +71,7 @@ cmds['switch'] = { 'MATHVOLT'   : { 'cmd' : "CALC:VOLT:MATH:STAT ", 'vital' : Fa
 #"Get commands" return specific device parameter
 cmds['get'] = { 'ID' :        { 'cmd' : "*IDN?", 'vital' : True },                                            #@Get device ID
                 'INTERLOCK' : { 'cmd' : "OUTP:INT:TRIP?", 'isOK' : ['1'] , 'isNOT' : ['0'], 'vital' : True }, #@Check interlock status, if isOK is returned then OK 
+                'INHIBITOR' : { 'cmd' : "OUTP:INT:TRIP?", 'isOK' : ['1'] , 'isNOT' : ['0'], 'vital' : True},  #@Check inhibitor status, the same as Interlock here
                 'POSETUP'   : { 'cmd' : "SYST:POS?", 'isOK' : ["RST"], 'vital' : False},                      #@Get power-on default settings status  
                 'ZCHECK'    : { 'cmd' : "CURR:AZER:STAT?", 'vital' : False},                                  #@Get AutoZero Correct status
                 'ZCOR'      : { 'cmd' : "CURR:AZER:STAT?", 'vital' : False},                                  #@Get AutoZero Correct status
@@ -122,7 +123,7 @@ pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },          
          'readoutIdentifier' : { 'par' : "", 'vital' : True, 'alt' : ""},           #@Each readout reading consists of this string
          'decimalVolt'       : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Check if decimal accuracy for setting volts is allowed
          'interlockCheckable' : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of interlock status
-         'inhibitorCheckable' : { 'par' : False,'vital' : True, 'alt' : ""},        #@Checkability of inhibitor status
+         'inhibitorCheckable' : { 'par' : True,'vital' : True, 'alt' : ""},        #@Checkability of inhibitor status
          'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of voltage limits
          'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of current limits

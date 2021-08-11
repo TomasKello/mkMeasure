@@ -67,7 +67,6 @@ class SerialConnector:
                     working_ports.append(port)
                 except (OSError, serial.SerialException):
                     pass
-        print(working_ports)
         return working_ports
 
     def __detect_devices__(self):
@@ -276,8 +275,6 @@ class SerialConnector:
                             relevantPorts[relDev] = [port for port in COM_ports
                                                      if (("USB" in port or "ttyS" in port or "ACM" in port) and port not in usedPorts)
                                                     ]
-                    print(relDev+":")
-                    print(relevantPorts[relDev])  
                     isDefault = False
                     for port in relevantPorts[relDev]:
                         #print("reldev="+relDev+" port="+port)
@@ -319,7 +316,6 @@ class SerialConnector:
         for key in selected_ports.keys():
             if key not in ['meas','source']:
                 self.log("i","Device of type %s: ID=%s, port=%s"%(key,selected_ports[key]['id'],selected_ports[key]['port']))
-        print(selected_ports) 
         return selected_ports
 
     def __set_RS232__(self,this_port):
@@ -329,7 +325,6 @@ class SerialConnector:
         if this_port['visa']:
             rm = pyvisa.ResourceManager('@py')
             rss = rm.list_resources()
-            print(rss)
             this_com = rm.open_resource(this_port['port']) 
         else:    
             this_com = serial.Serial(

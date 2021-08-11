@@ -403,6 +403,14 @@ if __name__ == '__main__':
         if "source" in args.addPort: 
             args.extVSource = True
 
+        #---------------------------------------------------------
+        #Fast probing can be evoked by using 'probeFast' keyword
+        #---------------------------------------------------------
+        args.probeFast = False
+        if "probeFast" in args.addPort:
+            args.addPort[args.addPort.index('probeFast')] = 'probe'
+            args.probeFast = True
+
     #---------------------------------------
     #Initialize connector and device classes
     #---------------------------------------

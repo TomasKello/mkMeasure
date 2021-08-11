@@ -84,6 +84,8 @@ class Device:
                     sys.exit(0)
                 else:
                     self.log("w","Device ID="+com['id']+" not matched. Retry...")
+                    self.log("w","MODEL found    = "+str(real_id))
+                    self.log("w","MODEL required = "+com['model'])
                     real_id = "FAILED"
             else:
                 self.log("i","Response received from DEV_NAME="+str(real_id))
@@ -93,6 +95,8 @@ class Device:
                 sys.exit(0)
             else:
                 self.log("w","Device ID="+com['id']+" not matched. Retry...")
+                self.log("w","MODEL found    = "+str(real_id))
+                self.log("w","MODEL required = "+com['model']) 
                 real_id = "FAILED"
 
         return real_id,com
@@ -2061,18 +2065,26 @@ class Device:
             preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
             if 'probe' in self.args.addSocket or 'probe' in self.args.addPort:
                 #dry run needed
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
-                self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
-                self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+                if not self.args.probeFast:
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                    self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
 
                 #real run 
-                preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
-                preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
-                preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
-                preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
-                preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+                if self.args.probeFast:
+                    preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    preTemp1 = 'N/A'
+                    preTemp2 = 'N/A'
+                    preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    preLumi = 'N/A'
+                else:
+                    preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                    preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                    preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
             enviro['temp1'] = preTemp0
             enviro['temp2'] = preTemp1
             enviro['temp3'] = preTemp2
@@ -2120,12 +2132,20 @@ class Device:
             readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim"))
             for iread,reading in enumerate(readout_list):
                 if self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier")) != 0:
-                    curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier"),''))
+                    try:
+                        curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier"),''))
+                    except ValueError:
+                        self.log("w","Incorrect value returned on readout.")
+                        self.__terminate__("EXIT")
                     current_readings.append(curr)
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(curr))
                 elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
-                    current_readings.append(float(reading))
+                    try:
+                        current_readings.append(float(reading))
+                    except ValueError:
+                        self.log("w","Incorrect value returned on readout.")
+                        self.__terminate__("EXIT")
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(reading))        
 
@@ -2547,19 +2567,27 @@ class Device:
             enviro = {}
             preTemp0,preTemp1,preTemp2,preHumi,preLumi = "N/A","N/A","N/A","N/A","N/A"
             if 'probe' in self.args.addSocket or 'probe' in self.args.addPort:
-                #dry run needed
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
-                self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
-                self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
-                self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+                if not self.args.probeFast:
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                    self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                    self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
 
-                #real run
-                preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
-                preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
-                preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
-                preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
-                preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+                #real run 
+                if self.args.probeFast:
+                    preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    preTemp1 = 'N/A'
+                    preTemp2 = 'N/A'
+                    preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    preLumi = 'N/A'
+                else:
+                    preTemp0 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP0?",vital=True))
+                    preTemp1 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP1?"))
+                    preTemp2 = self.__read__(self.__cmd__(self.coms['probe'],"TEMP2?"))
+                    preHumi = self.__read__(self.__cmd__(self.coms['probe'],"HUMI?",vital=True))
+                    preLumi = self.__read__(self.__cmd__(self.coms['probe'],"LUMI?",vital=True))
+
             enviro['temp1'] = preTemp0
             enviro['temp2'] = preTemp1
             enviro['temp3'] = preTemp2
