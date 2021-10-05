@@ -37,7 +37,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     #add options
-    parser.add_argument('-i', '--inputFile', nargs=1, dest='inputFile', help='Supported input format is JSON.', action='store', default=None )
     parser.add_argument('--cfg', dest='configFile', help='Configuration file.', action='store', default=None )
     parser.add_argument('--save', dest='save', help='Save plots as png.', action='store_true', default=True )
     parser.add_argument('--show', dest='show', help='Show plots in interactive GUI.', action='store_true', default=False )
@@ -52,12 +51,15 @@ if __name__ == '__main__':
     #------------------------------------
     config = None
     groups = None
+    general = None
     if args.configFile is not None:
         if os.path.isfile(args.configFile):
             _mod = importlib.import_module(args.configFile.replace(".py","")) 
             if hasattr(_mod,"groups"):
                 groups = _mod.groups    
                 log("i","Parsing config: "+args.configFile)
+            if hasattr(_mod,"general"):
+                general = _mod.general
         else:
             log("e","Plotting configuration file not found.")
             sys.exit(0)  
@@ -134,15 +136,16 @@ if __name__ == '__main__':
         sys.exit(0)
 
     #-----------------------
-    #General text settings
+    #General settings
     #-----------------------
     params = { 'text.usetex'   : True,
-               'font.family'   : 'serif',   
-               #'axes.labelsize': 18,
-               #'axes.titlesize': 12 
+               'font.family'   : 'serif', 
+               'figure.figsize': general['canvasSize'],
+               'figure.autolayout' : True,
+               'ytick.labelsize' : 14,
+               'xtick.labelsize' : 14
     }
     plt.rcParams.update(params) 
-    #plt.rc('text', usetex=True) #turn ON latex in text
     #plt.rc('font', family='serif')
 
     #-------------------
@@ -204,23 +207,27 @@ if __name__ == '__main__':
             #---------------------
             for iplot,plot in enumerate(group['plots']):
                 if iplot == 0:
-                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'],label=plot['legendName'])
+                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'], marker=plot['markerStyle'], s=plot['markerSize'], label=plot['legendName'], logy=group['logy'])
                 else:
-                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'],label=plot['legendName'], ax=figures[0])  
+                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'], marker=plot['markerStyle'], s=plot['markerSize'], label=plot['legendName'], logy=group['logy'], ax=figures[0])  
                 figures.append(figure)  
 
             #--------------------------------
             #Group global settings
             #--------------------------------
-            plt.axis([group['xRangeUser'][0],group['xRangeUser'][1],0,round(maxY1+0.10*maxY1)])
-            plt.xlabel(group['xAxisTitle'], fontsize=14)
-            plt.ylabel(group['y1AxisTitle'], fontsize=14)
+            if group['logy']:  
+                plt.axis([group['xRangeUser'][0],group['xRangeUser'][1],group['logyMin'],round(maxY1+0.10*maxY1)])
+            else:
+                plt.axis([group['xRangeUser'][0],group['xRangeUser'][1],0,round(maxY1+0.10*maxY1)])
+            plt.xlabel(group['xAxisTitle'], fontsize=group['xAxisTitleSize'])
+            plt.ylabel(group['y1AxisTitle'], fontsize=group['y1AxisTitleSize'])
             plt.title(group["title"], loc='right', fontsize=14)
             plt.title(r'\fontsize{18pt}{3em}\selectfont{}{\textbf{CMS}}\fontsize{14pt}{3em}\selectfont{}{\textit{ Internal}}', loc='left')
-            plt.legend(fontsize=14)
+            plt.legend(fontsize=group['legendFontSize'], ncol=group['legendColumns'])
 
             #set yaxis label precision
             #for fig in figures:
+            #     fig.set_yscale('log')
             #    fig.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0e'))
 
             if args.show:
@@ -237,4 +244,5 @@ if __name__ == '__main__':
 
                     #plot canvas
                     figIV.savefig(tag+"/"+group['type']+".png")
+                    figIV.savefig(tag+"/"+group['type']+".pdf")
 
