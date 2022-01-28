@@ -368,18 +368,27 @@ class SerialConnector:
                 if not self.args.isStandByZOnly:
                     if 'meas' not in goodAttempts.keys():   
                         COMS['meas'] = self.__set_RS232__(ports['meas'])
-                    else:
-                        COMS['meas'] = goodCOMS['meas']
+                    elif 'meas' in goodAttempts.keys():
+                        if not ports['meas']['visa']:
+                            COMS['meas'] = self.__set_RS232__(ports['meas'])
+                        else:
+                            COMS['meas'] = goodCOMS['meas']
                 if self.args.extVSource:
                     if 'source' not in goodAttempts.keys(): 
                         COMS['source'] = self.__set_RS232__(ports['source'])
-                    else:
-                        COMS['source'] = goodCOMS['source']
+                    elif 'source' in goodAttempts.keys():
+                        if not ports['source']['visa']:
+                            COMS['source'] = self.__set_RS232__(ports['source'])
+                        else:
+                            COMS['source'] = goodCOMS['source']   
             for dev_type in self.args.addPort:
                 if dev_type not in goodAttempts.keys():
                     COMS[dev_type] = self.__set_RS232__(ports[dev_type])
-                else:
-                    COMS[dev_type] = goodCOMS[dev_type] 
+                elif dev_type in goodAttempts.keys():
+                    if not ports[dev_type]['visa']:
+                        COMS[dev_type] = self.__set_RS232__(ports[dev_type])
+                    else: 
+                        COMS[dev_type] = goodCOMS[dev_type]
         except KeyError as e:
             self.log("f","Port selection failed during bit exchange. Repeat selection.")
             self.log("f","Missing key: "+str(e)) 

@@ -36,6 +36,7 @@ cmds['set'] = { 'STIME'    : { 'cmd' : "SYST:TIME ", 'vital' : False},          
                 'STRIGGERALWAYSBRANCH': { 'cmd' : "TRIG:BLOC:BRAN:ALW ", 'vital' : False}, #@Set trigger branch that always redirect from block A to B
                 'STRIGGERLIMITBRANCH': { 'cmd' : "TRIG:BLOC:BRAN:LIM:CONS ", 'vital' : False}, #@Set trigger branch that redirect from block A to C when condition is applied          
                 'STRIGGERSOURCE' : { 'cmd' : "TRIG:BLOC:SOUR:STAT ", 'vital' : False}, #@Set trigger to turn ON/OFF source in trigger sequence             
+                'SPANEL' : { 'cmd' : "ROUT:TERM ", 'vital' : False},                   #@Set output panel to be used
                 'FILLBUFF' : { 'cmd' : "TRAC:FILL:MODE ", 'vital' : False},            #@Set how buffer is filled 
 }
 
@@ -85,6 +86,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "*IDN?", 'vital' : True },              
                 'SCRANGE'      : { 'cmd' : "SENS:CURR:RANG?", 'vital' : False},                               #@Get Measurement Current range (user)
                 'TRIGGER'   : { 'cmd' : "TRIG:STAT?", 'vital' : True},                                        #@Get trigger state (returns string)
                 'READOUT'   : { 'cmd' : "TRAC:DATA? ", 'vital' : True},                                       #@Readout data from buffer
+                'BUFFEREND' : { 'cmd' : "TRAC:ACT:END?", 'vital' : False},                                    #@Get last index of buffer
 }
 
 #"Do commands" invoke device function which does not require additional parameter
@@ -103,18 +105,18 @@ cmds['do'] = { 'RESET'   : { 'cmd' : "*RST", 'vital' : True },                  
 #----------------------PARAMETERS----------------------#
 ########################################################
 
-pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },              #@Extreme minimum voltage to be set on this device (user). Can be set up to -defBias.
-         'maxBias' : { 'par' :  900, 'vital' : True, 'alt' : "maxV" },              #@Extreme maximum voltage to be set on this device (user). Can be set up to defBias.
-         'maxCurrent' : { 'par' :  30e-6, 'vital' : True, 'alt' : "maxC" },            #@Extreme maximum output current [A] to be set on this device (user). Can be set up to defCurrent.
-         'userCurrent' : { 'par' : 29.9, 'vital' : False, 'alt' : "userC" },          #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
+pars = { 'minBias' : { 'par' : -1000, 'vital' : True, 'alt' : "minV" },              #@Extreme minimum voltage to be set on this device (user). Can be set up to -defBias.
+         'maxBias' : { 'par' :  1000, 'vital' : True, 'alt' : "maxV" },                #@Extreme maximum voltage to be set on this device (user). Can be set up to defBias.
+         'maxCurrent' : { 'par' :  30e-6, 'vital' : True, 'alt' : "maxC" },         #@Extreme maximum output current [A] to be set on this device (user). Can be set up to defCurrent.
+         'userCurrent' : { 'par' : 29.9, 'vital' : False, 'alt' : "userC" },        #@User defined maximum output current [muA] to be checked after each readout due to fragile measurement target.
          'defBias' : { 'par' : 1100, 'vital' : True, 'alt' : "defaultMaxV"},        #@Factory settings total (absolute) maximum of voltage to be set on this device (manufacturer)
          'defCurrent' : { 'par' : 1.05e-4, 'vital' : True, 'alt' : "defaultMaxC"},  #@Factory settings total maximum of current [A] to be set on this device (manufacturer) 
          'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                  #@Basic sleep time in seconds needed for proper running of device routines
          'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                  #@Medium sleep time  
          'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                  #@Long sleep time
          'minSampleTime' : { 'par' : 0.50, 'vital' : False, 'alt' : "minSTime"},    #@Minimum sample time for a single IV measurement
-         'maxNSamples'   : { 'par' : 100,    'vital' : False, 'alt' : "" },         #@Maximum number of samples per single IV measurement
-         'minNSamples'   : { 'par' : 10,    'vital' : False, 'alt' : "" },         #@Minimum number of samples per single IV measurement
+         'maxNSamples'   : { 'par' : 50,    'vital' : False, 'alt' : "" },         #@Maximum number of samples per single IV measurement
+         'minNSamples'   : { 'par' : 10,    'vital' : False, 'alt' : "" },          #@Minimum number of samples per single IV measurement
          'fCurr'         : { 'par' : '\'CURR\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining CurrentMeasurement function 
          'fVolt'         : { 'par' : '\'VOLT\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining VoltageMeasurement function
          'triggerType'   : { 'par' : '\"Empty\"', 'vital' : True, 'alt' : ""},      #@Trigger source, build trigger from scratch
@@ -123,10 +125,11 @@ pars = { 'minBias' : { 'par' : -900, 'vital' : True, 'alt' : "minV" },          
          'readoutIdentifier' : { 'par' : "", 'vital' : True, 'alt' : ""},           #@Each readout reading consists of this string
          'decimalVolt'       : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Check if decimal accuracy for setting volts is allowed
          'interlockCheckable' : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of interlock status
-         'inhibitorCheckable' : { 'par' : True,'vital' : True, 'alt' : ""},        #@Checkability of inhibitor status
-         'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},         #@Checkability of remote control
+         'inhibitorCheckable' : { 'par' : True,'vital' : True, 'alt' : ""},         #@Checkability of inhibitor status
+         'remoteCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of remote control
          'vlimitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of voltage limits
          'climitCheckable'    : { 'par' : True, 'vital' : True, 'alt' : ""},        #@Checkability of current limits
+         'biasPolarity'       : { 'par' : -1., 'vital' : False, 'alt' : ""},        #@Specify device default polarity (if not defined then bias sign is accepted as on input)
 }
 
 ##########

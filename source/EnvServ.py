@@ -23,10 +23,7 @@ cmds['set'] = { 'STIME'    : { 'cmd' : "", 'vital' : False},                    
 }
 
 #"Switch commands" switch between ON and OFF states
-cmds['switch'] = { 'MATH'    : { 'cmd' : "", 'vital' : False },               #@Disable/Enable math operations
-                   'ZCHECK'  : { 'cmd' : "", 'vital' : False},                 #@Enable/Disable zero check
-                   'ZCOR'    : { 'cmd' : "", 'vital' : False},           #@Enable/Disable zero correction
-                   'TRIGGERINIT'  : { 'cmd' : "", 'vital' : True},            #@Enable/Disable continuous trigger initiation
+cmds['switch'] = { 'TRIGGERINIT'  : { 'cmd' : "", 'vital' : True},            #@Enable/Disable continuous trigger initiation
 }
 
 #"Get commands" return specific device parameter
@@ -58,9 +55,9 @@ cmds['do'] = { 'CMDINIT' : { 'cmd' : "", 'vital' : False},              #@Some d
 #----------------------PARAMETERS----------------------#
 ########################################################
 
-pars = { 'tShort'  : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                        #@Basic sleep time in seconds needed for proper running of device routines
-         'tMedium' : { 'par' :  1.5, 'vital' : True, 'alt' : "" },                        #@Medium sleep time
-         'tLong'   : { 'par' :  3.0, 'vital' : True, 'alt' : "" },                        #@Long sleep time
+pars = { 'tShort'  : { 'par' :  0.05, 'vital' : True, 'alt' : "" },                        #@Basic sleep time in seconds needed for proper running of device routines
+         'tMedium' : { 'par' :  0.2, 'vital' : True, 'alt' : "" },                        #@Medium sleep time
+         'tLong'   : { 'par' :  0.5, 'vital' : True, 'alt' : "" },                        #@Long sleep time
          'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},                   #@Readout for each sample is devided by this character
          'interlockCheckable' : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of interlock status
          'remoteCheckable'    : { 'par' : False, 'vital' : True, 'alt' : ""},             #@Checkability of remote control
@@ -82,9 +79,9 @@ class EnvServ():
         self.delim = '\r'
 
         # sleep constants
-        self.sleep_time = 0.5
-        self.medium_sleep_time = 1.5
-        self.long_sleep_time = 3.0
+        self.sleep_time = pars['tShort']['par']
+        self.medium_sleep_time = pars['tMedium']['par']
+        self.long_sleep_time = pars['tLong']['par']
 
         # time
         now = dt.datetime.now()
@@ -148,7 +145,10 @@ class EnvServ():
         # Define device-specific 'write' routine here
         # -------------------------------------------
         time.sleep(self.sleep_time)
-        write_status = com.write((cmd+self.delim).encode())
+        if com.is_open: #extra layer of protection due to self resetting embed
+            write_status = com.write((cmd+self.delim).encode())
+        else:
+            return False 
         return write_status
 
     def read(self, com, cmd):
@@ -156,12 +156,18 @@ class EnvServ():
         # Define device-specific 'read' routine here
         # ------------------------------------------
         time.sleep(self.sleep_time)
-        com.write((cmd+self.delim).encode())
+        if com.is_open: #extra layer of protection due to self resetting embed
+            com.write((cmd+self.delim).encode())
+        else:
+            return "CONNECTION LOST"
         time.sleep(self.medium_sleep_time)
         read_value = ""
-        while com.inWaiting() > 0:
-            part = com.read(1).decode().strip('\r')
-            read_value += part
+        if com.is_open: #extra layer of protection due to self resetting embed
+            while com.inWaiting() > 0 and com.is_open:
+                part = com.read(1).decode().strip('\r')
+                read_value += part
+        else:
+            return "CONNECTION LOST"
         return read_value.rstrip()
 
     def pre(self,com):
