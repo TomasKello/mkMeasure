@@ -95,13 +95,15 @@ if __name__ == '__main__':
                             with open(plot['input']) as dataFile:
                                 dataSequence = json.load(dataFile)
                             data = {}
-                            if len(dataSequence.keys()) == 1 and group['type'] in dataSequence.keys() and internalOrder == 0:
-                                if len(dataSequence[group['type']]) == 1:    
-                                    plot['data'] = dataSequence[group['type']][0] #dict
+                            aliasType = group['type']
+                            if group['type'] == "contHV": aliasType = "contIV" 
+                            if len(dataSequence.keys()) == 1 and aliasType in dataSequence.keys() and internalOrder == 0:
+                                if len(dataSequence[aliasType]) == 1:    
+                                    plot['data'] = dataSequence[aliasType][0] #dict
                                     group['internalOrder'] = 0
-                            elif len(dataSequence.keys()) == 1 and group['type'] in dataSequence.keys() and internalOrder == 1:
-                                if len(dataSequence[group['type']]) > 1:
-                                    plot['data'] = dataSequence[group['type']] #list of dicts
+                            elif len(dataSequence.keys()) == 1 and aliasType in dataSequence.keys() and internalOrder == 1:
+                                if len(dataSequence[aliasType]) > 1:
+                                    plot['data'] = dataSequence[aliasType] #list of dicts
                                     group['internalOrder'] = 1     
                     if plotCfgOk:
                         _plots.append(plot)
@@ -246,3 +248,92 @@ if __name__ == '__main__':
                     figIV.savefig(tag+"/"+group['type']+".png")
                     figIV.savefig(tag+"/"+group['type']+".pdf")
 
+        elif "HV" in group['type']:
+            for iplot,plot in enumerate(group['plots']):
+                _data = plot['data']
+                isAllNeg = True
+                for bias in _data['bias']:
+                    if float(bias) > 0.: isAllNeg = False
+                for i,bias in enumerate(_data['bias']):
+                    sign = 1.0
+                    scaleY1 = 1.0
+                    if isAllNeg: sign = -1.0
+                    if 'scaleY1' in group.keys(): scaleY1 = group['scaleY1']
+                    formData = {}
+                    if sign < 0.0 and group['plotPositive']:
+                        formData["bias_"+str(iplot)] = float(bias)*sign
+                    else:
+                        formData["bias_"+str(iplot)] = float(bias)
+                    formData["curr_"+str(iplot)] = float(_data['curr'][i])*scaleY1
+                    if abs(float(_data['curr'][i])*scaleY1) >= maxY1: maxY1 = abs(float(_data['curr'][i])*scaleY1)
+                    try:
+                        formData["tmp1_"+str(iplot)] = float(_data['tmp1'][i])
+                    except ValueError:
+                        formData["tmp1_"+str(iplot)] = 0.0
+                    try:
+                        formData["tmp2_"+str(iplot)] = float(_data['tmp2'][i])
+                    except ValueError:
+                        formData["tmp2_"+str(iplot)] = 0.0
+                    try:
+                        formData["tmp3_"+str(iplot)] = float(_data['tmp3'][i])
+                    except ValueError:
+                        formData["tmp3_"+str(iplot)] = 0.0
+                    try:
+                        formData["humi_"+str(iplot)] = float(_data['humi'][i])
+                    except ValueError:
+                        formData["humi_"+str(iplot)] = 0.0
+                    try:
+                        formData["lumi_"+str(iplot)] = float(_data['lumi'][i])
+                    except ValueError:
+                        formData["lumi_"+str(iplot)] = 0.0
+                    formDataList.append(formData)
+
+            #----------------------------
+            #Create and print data frame
+            #----------------------------
+            dataFrame = pd.DataFrame(formDataList)
+            print(dataFrame)
+
+            #---------------------
+            #Plotting
+            #---------------------
+            for iplot,plot in enumerate(group['plots']):
+                if iplot == 0:
+                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'], marker=plot['markerStyle'], s=plot['markerSize'], label=plot['legendName'], logy=group['logy'])
+                else:
+                    figure = dataFrame.plot.scatter(x="bias_"+str(iplot), y="curr_"+str(iplot), color=plot['color'], marker=plot['markerStyle'], s=plot['markerSize'], label=plot['legendName'], logy=group['logy'], ax=figures[0])
+                figures.append(figure)
+
+            #--------------------------------
+            #Group global settings
+            #--------------------------------
+            if group['logy']:
+                plt.axis([group['xRangeUser'][0],group['xRangeUser'][1],group['logyMin'],round(maxY1+0.10*maxY1)])
+            else:
+                plt.axis([group['xRangeUser'][0],group['xRangeUser'][1],-round(maxY1+0.10*maxY1),round(maxY1+0.10*maxY1)])
+            plt.xlabel(group['xAxisTitle'], fontsize=group['xAxisTitleSize'])
+            plt.ylabel(group['y1AxisTitle'], fontsize=group['y1AxisTitleSize'])
+            plt.title(group["title"], loc='right', fontsize=14)
+            plt.title(r'\fontsize{18pt}{3em}\selectfont{}{\textbf{CMS}}\fontsize{14pt}{3em}\selectfont{}{\textit{ Internal}}', loc='left')
+            plt.legend(fontsize=group['legendFontSize'], ncol=group['legendColumns'])
+
+            #set yaxis label precision
+            #for fig in figures:
+            #     fig.set_yscale('log')
+            #    fig.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.0e'))
+
+            if args.show:
+                plt.show()
+            elif args.save:
+                #create arch
+                tag = "output_"+_date()+"_"+groupKey.replace(" ","_")
+                if not os.path.exists("./"+tag):
+                    os.mkdir(tag)
+
+                #retrieve figure canvas
+                for fig in figures:
+                    figHV = fig.get_figure()
+
+                    #plot canvas
+                    figHV.savefig(tag+"/"+group['type']+".png")
+                    figHV.savefig(tag+"/"+group['type']+".pdf")

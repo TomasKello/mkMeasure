@@ -27,7 +27,7 @@ cmds['set'] = { 'STIME'    : { 'cmd' : "", 'vital' : False},                    
                 'STRIGGER' : { 'cmd' : "", 'vital' : True},                     #@Set measure event control source
                 'STRIGGERDELAY' : { 'cmd' : "", 'vital' : False},               #@Set trigger delay in seconds
                 'STRIGGERTIME'  : { 'cmd' : "", 'vital' : True},                #@Set interval for measure layer timer
-                'FILLBUFF' : { 'cmd' : "", 'vital' : True},                     #@Set how buffer is filled 
+                'FILLBUFF' : { 'cmd' : "", 'vital' : True},                     #@Set how buffer is filled   
 }
 
 #"Switch commands" switch between ON and OFF states
