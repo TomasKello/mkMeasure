@@ -2153,7 +2153,7 @@ class Device:
                 self.log("i","Humidity before measurement: "+str(preHumi))
                 self.log("i","Lumi before measurement: "+str(preLumi))    
 
-            #Read out measurement data
+            #Read out measurement data and store in buffer
             readout = ""
             self.__write__(self.__cmd__(self.coms['meas'],"CLRBUFF",vital=True))
             if source_dev != "meas":
@@ -2173,14 +2173,29 @@ class Device:
                 self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
                 _vitalTriggerOFF = True
             else:
-                bufferTime = (int(self.__par__(self.coms['meas'],"maxNSamples"))*8+5)*(sampleTime/60.)
+                bufferTime = (int(self.__par__(self.coms['meas'],"maxNSamples"))*4+5)*(sampleTime/60.)
                 self.log("i","Filling buffer... ( waiting time ~"+str(bufferTime)+"s)")
                 time.sleep(bufferTime)
-            #readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples)+", \"defbuffer1\", READ", vital=True))  #Read data from full buffer
-            lastIdx = int(self.__par__(self.coms['meas'],"maxNSamples"))+nSamples-1 
+            triggIsIdleString = self.__par__(self.coms['meas'],"triggerIdle")
+            lastIdx = int(self.__par__(self.coms['meas'],"maxNSamples"))+nSamples-1
             minIdx = min(int(self.__par__(self.coms['meas'],"maxNSamples"))+nSamples-1, lastIdx)
             readoutRange = str(self.__par__(self.coms['meas'],"maxNSamples"))+", "+str(minIdx)
+            minInBuffer = int(self.__par__(self.coms['meas'],"maxNSamples"))*2
+ 
+            #Read out buffer
+            currInBuffer = 0 
+            while True:
+                try:
+                    time.sleep(3) 
+                    currInBuffer = int(self.__read__(self.__cmd__(self.coms['meas'],"INBUFFER?"))) 
+                    self.log("i","Readouts in buffer: "+str(currInBuffer)) 
+                    if currInBuffer >= minInBuffer: break
+                except ValueError:
+                    self.log("i","Readouts in buffer: "+str(currInBuffer))
+                    pass   
             readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg=readoutRange+", \"defbuffer1\", READ", vital=True)) 
+            if str(readout) == currInBuffer:
+                readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg=readoutRange+", \"defbuffer1\", READ", vital=True))  
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=False))                                    #Stop trigger (not needed)
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
 

@@ -86,6 +86,7 @@ cmds['get'] = { 'ID' :        { 'cmd' : "*IDN?", 'vital' : True },              
                 'SCRANGE'      : { 'cmd' : "SENS:CURR:RANG?", 'vital' : False},                               #@Get Measurement Current range (user)
                 'TRIGGER'   : { 'cmd' : "TRIG:STAT?", 'vital' : True},                                        #@Get trigger state (returns string)
                 'READOUT'   : { 'cmd' : "TRAC:DATA? ", 'vital' : True},                                       #@Readout data from buffer
+                'INBUFFER'  : { 'cmd' : "TRAC:ACT?", 'vital' : True},                                        #@Return number of readings in buffer
                 'BUFFEREND' : { 'cmd' : "TRAC:ACT:END?", 'vital' : False},                                    #@Get last index of buffer
 }
 
@@ -120,6 +121,7 @@ pars = { 'minBias' : { 'par' : -1000, 'vital' : True, 'alt' : "minV" },         
          'fCurr'         : { 'par' : '\'CURR\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining CurrentMeasurement function 
          'fVolt'         : { 'par' : '\'VOLT\'', 'vital' : True, 'alt' : "" },      #@SENSE argument defining VoltageMeasurement function
          'triggerType'   : { 'par' : '\"Empty\"', 'vital' : True, 'alt' : ""},      #@Trigger source, build trigger from scratch
+         'triggerIdle'   : { 'par' : 'IDLE', 'vital' : True, 'alt' : ""},           #@String returned when Trigger is on Idle
          'bufferMode'    : { 'par' : 'ONCE', 'vital' : False, 'alt' : ""},          #@Buffer mode, ONCE = fill buffer and stops
          'readoutDelim'  : { 'par' : ',' , 'vital' : True, 'alt' : ""},             #@Readout for each sample is devided by this character
          'readoutIdentifier' : { 'par' : "", 'vital' : True, 'alt' : ""},           #@Each readout reading consists of this string
