@@ -2492,17 +2492,21 @@ class Device:
 
         #Adjusting voltage range
         _range = "1"
-        if abs(float(biasPoint)) > 100.:
+        maxBiasPoint = max(abs(float(min(biasRange))),abs(float(max(biasRange))))
+        print("KELLO: "+str(maxBiasPoint))
+        if maxBiasPoint > 100.:
             if int(self.__par__(self.coms[source_dev],"defBias")) <= 1000:
                 _range = str(int(self.__par__(self.coms[source_dev],"defBias")))
             else:
                 _range = "1000"
+            _range = "1000" #KELLO override
             self.__write__(self.__cmd__(self.coms[source_dev],"SVRANGE",arg=_range))
         else:
             if int(self.__par__(self.coms[source_dev],"defBias")) <= 100:
                 _range = str(int(self.__par__(self.coms[source_dev],"defBias")))
             else:
                 _range = "100"
+            _range= "1000" #KELLO override
             self.__write__(self.__cmd__(self.coms[source_dev],"SVRANGE",arg=_range))
 
         #Define measurement type to IV
@@ -2525,7 +2529,7 @@ class Device:
         time.sleep(self.sleep_time['meas']['medium'])
 
         #Setup buffer memory size if possible
-        self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(nSamples),vital=True))
+        self.__write__(self.__cmd__(self.coms['meas'],"BUFFSIZE",arg=str(int(self.__par__(self.coms['meas'],"maxNSamples"))*4),vital=True))
 
         #Setup trigger if possible
         triggerType = self.__par__(self.coms['meas'],"triggerType")
@@ -2535,7 +2539,8 @@ class Device:
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERTIME",arg=str("%f"%(sampleTime)),vital=True))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCLEAR",arg="1"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERMDIG",arg="2"))
-                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                #self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(nSamples)+", 2"))
+                self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERCOUNT",arg="3, "+str(int(self.__par__(self.coms['meas'],"maxNSamples"))*2)+", 2"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERLIMITBRANCH",arg="4, IN, "+str(self.maxCurrent)+", 1e-2, 6"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERALWAYSBRANCH",arg="5, 7"))
                 self.__write__(self.__cmd__(self.coms['meas'],"STRIGGERSOURCE",arg="6, 0"))
@@ -2663,9 +2668,33 @@ class Device:
                 time.sleep((nSamples+1)*sampleTime)                                                                                    #Wait until measurement is done
                 self.__write__(self.__cmd__(self.coms['meas'],"FILLBUFF",arg=self.__par__(self.coms['meas'],"bufferMode"),vital=True)) #Tell trigger to stop passing if buffer is full
                 _vitalTriggerOFF = True
-            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg="1, "+str(nSamples)+", \"defbuffer1\", READ", vital=True))  #Read data from full buffer
+            else:
+                bufferTime = (int(self.__par__(self.coms['meas'],"maxNSamples"))*4+5)*(sampleTime/60.)
+                self.log("i","Filling buffer... ( waiting time ~"+str(bufferTime)+"s)")
+                time.sleep(bufferTime)
+            triggIsIdleString = self.__par__(self.coms['meas'],"triggerIdle")
+            lastIdx = int(self.__par__(self.coms['meas'],"maxNSamples"))+nSamples-1
+            minIdx = min(int(self.__par__(self.coms['meas'],"maxNSamples"))+nSamples-1, lastIdx)
+            readoutRange = str(self.__par__(self.coms['meas'],"maxNSamples"))+", "+str(minIdx)
+            minInBuffer = int(self.__par__(self.coms['meas'],"maxNSamples"))*2
+
+            #Read out buffer
+            currInBuffer = 0 
+            while True:
+                try:
+                    time.sleep(3) 
+                    currInBuffer = int(self.__read__(self.__cmd__(self.coms['meas'],"INBUFFER?"))) 
+                    self.log("i","Readouts in buffer: "+str(currInBuffer)) 
+                    if currInBuffer >= minInBuffer: break
+                except ValueError:
+                    self.log("i","Readouts in buffer: "+str(currInBuffer))
+                    pass   
+            readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg=readoutRange+", \"defbuffer1\", READ", vital=True)) 
+            if str(readout) == currInBuffer:
+                readout = self.__read__(self.__cmd__(self.coms['meas'],"READOUT?", arg=readoutRange+", \"defbuffer1\", READ", vital=True))  
             self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERINIT",arg="OFF",vital=False))                                    #Stop trigger (not needed)
-            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state
+            self.__write__(self.__cmd__(self.coms['meas'],"TRIGGERABORT"))                                                         #Send trigger to idle state     
+
 
             #Process and store results
             if len(readout) == 0:
@@ -2679,16 +2708,25 @@ class Device:
             readout_list = readout.split(self.__par__(self.coms['meas'],"readoutDelim"))
             for iread,reading in enumerate(readout_list):
                 if self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier")) != 0:
-                    curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier"),''))
+                    try:
+                        curr = float(reading.replace(self.__par__(self.coms['meas'],"readoutIdentifier"),''))
+                    except ValueError:
+                        self.log("w","Incorrect value returned on readout.")
+                        self.__terminate__("EXIT")
                     current_readings.append(curr)
                     if self.args.verbosity > 0:
                         self.log("i","Current reading: "+str(curr))
                 elif self.__par__(self.coms['meas'],"readoutIdentifier") in reading and len(self.__par__(self.coms['meas'],"readoutIdentifier"))==0:
-                    current_readings.append(float(reading))
+                    try:
+                        current_readings.append(float(reading))
+                    except ValueError:
+                        self.log("w","Incorrect value returned on readout.")
+                        self.__terminate__("EXIT")
                     if self.args.verbosity > 0:
-                        self.log("i","Current reading: "+str(reading))
+                        self.log("i","Current reading: "+str(reading))                
 
             current = 0.0
+            current_readings = self.__checkReadout__(current_readings)
             if len(current_readings) == nSamples:
                 current = sum(current_readings)/float(nSamples)
             else:
