@@ -1994,13 +1994,11 @@ class Device:
         #Adjusting voltage range
         _range = "1"
         maxBiasPoint = max(abs(float(min(biasRange))),abs(float(max(biasRange))))
-        print("KELLO: "+str(maxBiasPoint))
         if maxBiasPoint > 100.:
             if int(self.__par__(self.coms[source_dev],"defBias")) <= 1000:
                 _range = str(int(self.__par__(self.coms[source_dev],"defBias")))
             else:
                 _range = "1000"
-            _range = "1000" #KELLO override
             self.__write__(self.__cmd__(self.coms[source_dev],"SVRANGE",arg=_range))
         else:
             if int(self.__par__(self.coms[source_dev],"defBias")) <= 100:

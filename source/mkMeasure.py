@@ -288,7 +288,7 @@ if __name__ == '__main__':
     #!!!!EMG!!!!
 
     isOut = False
-    if (args.outTXT or args.outXML or args.outROOT or args.outPNG or args.outPDF or args.outCSV) and not EMG:
+    if (args.outTXT or args.outXML or args.outROOT or args.outJSON or args.outPNG or args.outPDF or args.outCSV) and not EMG:
         isOut = True
     if isOut:
         if args.isDB:
@@ -297,6 +297,8 @@ if __name__ == '__main__':
             outDir = exeDir[:exeDir.rfind("/")]+"/results/"+args.outputDir 
             args.outputDir = outDir
             log("i", "Results will be saved locally: "+args.outputDir)
+            if (args.outPNG or args.outPDF) and not args.outJSON:
+                log("w","JSON output not specified! Result will not be plotted!")
     else:
         if not EMG:
             log("w","Results will NOT be saved.")

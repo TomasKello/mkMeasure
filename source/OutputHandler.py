@@ -5,6 +5,7 @@ import datetime
 import json
 import csv
 import ColorLogger
+import OutputPlotter
 
 class OutputHandler:
     ##################################
@@ -225,7 +226,8 @@ class OutputHandler:
         with open(json_file_name, 'w') as json_file:
             json.dump(self.jsonBuffer, json_file)
         self.log("i","Saving file: "+json_file_name)
-        self.jsonBuffer = {}  
+        self.jsonBuffer = {}
+        return json_file_name
 
     def __saveCSV__(self):
         csv_file_name = self._uniqueName(self.args.outputDir+"/"+self.args.outputFile+"_"+self._date()+".csv")
@@ -235,7 +237,12 @@ class OutputHandler:
                 csvwriter.writerow(row)
         self.log("i","Saving file: "+csv_file_name)
         self.csvBuffer = [] 
-        
+
+    def __savePlot__(self, jsonFile):
+        plotter = OutputPlotter.OutputPlotter(self.args)
+        plotter.load(jsonFile,show=True)
+        plotter.plot()
+
     def store(self):
         if self.args.isDB:
             self.log("i","File: "+str(self.args.outputDir+"/"+self.args.outputFile+"_"+self._date()+".txt")+" --> DB")
@@ -252,7 +259,9 @@ class OutputHandler:
         if self.args.outTXT:
             self.__saveTXT__()
         if self.args.outJSON:
-            self.__saveJSON__()
+            jsonFile = self.__saveJSON__()
+            if self.args.outPNG or self.args.outPDF:
+                self.__savePlot__(jsonFile)
         if self.args.outCSV:
             self.__saveCSV__()
 

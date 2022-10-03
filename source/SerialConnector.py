@@ -117,7 +117,7 @@ class SerialConnector:
         devices['zstation'] = { 'id'       : "ESP100", 
                                 'model'    : "M-UZM80CC.1",
                                 'type'     : "zstation",  
-                                'port'     : "S0",     
+                                'port'     : "USB0",     
                                 'baudrate' : 19200,
                                 'parity'   : serial.PARITY_NONE,
                                 'stopbits' : serial.STOPBITS_ONE,
