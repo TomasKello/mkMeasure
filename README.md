@@ -28,8 +28,10 @@ chmod u+rwx update.sh
 - `--expOhm` defines ballpark of operational "resistance" (in Ohms) to set correct resolution. Option is used instead of `--autoRange` to speed up
 measurement.
 - `-vvv` defines 3rd level of verbosity (debug)
+  
 `mkMeasure --addPort probe -vvv -e all`
 - read enviro input only
+  
 `mkMeasure --term`
 `mkMeasure --abort`
 - mkMeasure has autonomous abort system
